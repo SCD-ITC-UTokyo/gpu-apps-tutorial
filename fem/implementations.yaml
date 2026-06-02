@@ -1,0 +1,66 @@
+# 実装 (impl) × variant の軸定義
+# マシン非依存。マシン固有のフラグは machines/<machine>.yaml 側を参照
+
+implementations:
+  openmp-target:
+    description: OpenMP target offloading (5.0+)
+    needs_mode: [gpu, uni]
+    parallel_flag: "-mp=gpu"          # NVHPC
+
+  openacc:
+    description: OpenACC
+    needs_mode: [gpu, uni]
+    parallel_flag: "-mp -acc=gpu"     # NVHPC
+
+  stdpar:
+    description: "C++ 言語標準 (std::execution::par)"
+    needs_mode: [gpu, uni]
+    parallel_flag: "-stdpar=gpu"
+    lang: cpp                          # C++ 限定
+
+  do-concurrent:
+    description: "Fortran 言語標準 (do concurrent)"
+    needs_mode: [gpu, uni]
+    parallel_flag: "-stdpar=gpu"
+    lang: f90                          # Fortran 限定
+
+  openmp-cpu:
+    description: OpenMP CPU (マルチコア並列のベースライン)
+    needs_mode: [cpu]
+    parallel_flag: ""                  # machine の compilers.<name>.openmp_flag を使う
+
+  kokkos:
+    description: Kokkos (C++ performance portability library)
+    needs_mode: [gpu, cpu]             # backend に依存 (Kokkos インストール側で決定)
+    lang: cpp
+    # variant パス: <policy>/<sub>
+    #   policy = range | mdrange | team
+    #   sub    = baseline | cpu-{sweep|tile-sweep|chunk-sweep} | uvm | uvm-{sweep|tile-sweep|chunk-sweep}
+    #            | baseline-fused | uvm-fused (range のみ)
+    # マクロ既定値 (sweep variant が要求するマクロ):
+    macros_default:
+      "_NX": 2                          # mdrange tile size
+      "_NY": 4
+      "_NZ": 16
+      "_CHUNK": 32                      # team chunk size
+
+# variant の軸: memory model × thread tuning
+# 決定 2: manu.opt と manu.def が同じでも別 entry として保持 (冗長を許容)
+variants:
+  auto.def:
+    memory: managed
+    description: 自動メモリ管理 + デフォルト並列度
+
+  auto.opt:
+    memory: managed
+    nthreads: 128                      # openmp-target / openacc のみ生成器が -DNTHREADS を追加
+    description: 自動メモリ管理 + NTHREADS=128 (omp-target/openacc のみ)
+
+  manu.def:
+    memory: separate
+    description: 手動メモリ管理 + デフォルト並列度
+
+  manu.opt:
+    memory: separate
+    nthreads: 128                      # vector_length(NTHREADS) を opt 系で使用
+    description: 手動メモリ管理 + NTHREADS=128 (openmp-target/openacc は vector_length 経由で使用)

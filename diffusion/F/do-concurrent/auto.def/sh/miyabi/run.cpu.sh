@@ -1,0 +1,98 @@
+#!/bin/bash
+
+################################
+## set job options.
+################################
+
+## for Wisteria ####
+
+#### use CPU(Wisteria-Odyssey) [ENABLED] ####
+#PJM -N "diffusion"
+#PJM -L rscgrp=debug-o
+#PJM -L node=1
+#PJM --omp thread=48
+#PJM -L elapse=00:10:00
+#PJM -g gr52
+#PJM -j
+
+#### use GPU(Wisteria-Aquarius) [DISABLED] ####
+##PJM -N "diffusion"
+##PJM -L rscgrp=debug-a
+##PJM -L node=1
+##PJM --omp thread=72
+##PJM -L elapse=00:10:00
+##PJM -g gr52
+##PJM -j
+
+## for Miyabi ####
+
+#### use CPU(Miyabi-C) [ENABLED] ####
+#PBS -N "diffusion"
+#PBS -q debug-c
+#PBS -l select=1:ompthreads=112
+#PBS -l walltime=00:10:00
+#PBS -W group_list=gr52
+#PBS -j oe
+
+#### use GPU(Miyabi-G) [DISABLED] ####
+##PBS -N "diffusion"
+##PBS -q debug-g
+##PBS -l select=1:ompthreads=72
+##PBS -l walltime=00:10:00
+##PBS -W group_list=gr52
+##PBS -j oe
+
+################################
+## setup environment.
+################################
+
+# load modules.
+case "$HOSTNAME" in
+    wo*) # Wisteria-Odyssey(CPU)
+	module purge
+	module load gcc
+	;;
+    wa*) # Wisteria-Aquarius(GPU)
+	module purge
+	module load nvidia
+	;;
+    mc*) # Miyabi-C(CPU)
+	module purge
+	module load intel
+	;;
+    mg*) # Miyabi-G(GPU)
+	module purge
+	module load nvidia
+	;;
+esac
+
+# change to job submission dir.
+if [ -n "${PJM_O_WORKDIR}" ]; then
+    cd ${PJM_O_WORKDIR}
+fi
+if [ -n "${PBS_O_WORKDIR}" ]; then
+    cd ${PBS_O_WORKDIR}
+fi
+
+################################
+## build the program.
+################################
+
+if [ "$task" = "build" ]; then
+    make -C src -f Makefile.cpu FP=32 clean install
+    make -C src -f Makefile.cpu FP=64 clean install
+    exit 0
+fi
+
+################################
+# benchmark the program.
+################################
+
+if [ "$task" = "bench" ]; then
+    for f in 32 64; do
+	for nx in 32 64 128 256 512; do
+	    bin/diffusion.cpu.$f $nx
+	done > log/bench.cpu.${f}_run.csv
+    done
+    exit 0
+fi

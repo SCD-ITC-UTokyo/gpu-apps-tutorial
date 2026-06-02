@@ -1,0 +1,31 @@
+# compile direct N-body code (base implementation for multicore CPUs)
+project(base CXX)
+message(STATUS "Generate ${PROJECT_NAME} ...")
+
+# Kokkos/4.7.2 settings
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+find_package(Kokkos REQUIRED) # find Kokkos libraly
+
+# define the executable
+set(SOURCES ${PROJECT_SOURCE_DIR}/nbody.cpp)
+
+add_executable(${PROJECT_NAME}
+    ${SOURCES}
+)
+
+# Kokkos/4.7.2 settings
+target_link_libraries(${PROJECT_NAME} PRIVATE Kokkos::kokkos)
+target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
+
+# apply common settings
+include(${USER_MODULE_PATH}/apply_common_settings.cmake)
+
+# add configuration for NVIDIA HPC SDK
+target_compile_options(${PROJECT_NAME} PRIVATE
+    $<$<AND:$<BOOL:${OpenMP_FOUND}>,$<CXX_COMPILER_ID:NVHPC>>:${OpenMP_CXX_FLAGS}=multicore>
+)
+target_link_libraries(${PROJECT_NAME} PRIVATE
+    $<$<AND:$<BOOL:${OpenMP_FOUND}>,$<CXX_COMPILER_ID:NVHPC>>:${OpenMP_CXX_FLAGS}=multicore>
+)

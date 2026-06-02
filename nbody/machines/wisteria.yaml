@@ -1,0 +1,63 @@
+# 東大 Wisteria
+description: "東大 Wisteria (PJM、Aquarius=A100/NVHPC 24.1、Odyssey=Fujitsu A64FX)"
+scheduler: pjm
+modes: [gpu, cpu]   # uni 非対応 (NVHPC 24.1 では mem:unified が無い)
+# 実行ホスト判定 (fnmatch パターン)
+host_patterns: ["wisteria*", "w[oa]*"]
+
+cpu:
+  default: gcc
+  compilers:
+    gcc:
+      cc:  { cmd: gcc,      flags: [] }
+      cxx: { cmd: g++,      flags: [-std=c++17] }
+      f90: { cmd: gfortran, flags: [-cpp, -ffree-line-length-none] }
+      openmp_flag: -fopenmp
+      common_flags: [-O3, -I.]
+      fortran_module_flag: "-Jmod"
+      fortran_include_flag: "-Imod"
+    fccpx:
+      cc:  { cmd: fccpx,  flags: [-Nclang] }
+      cxx: { cmd: FCCpx,  flags: [-Nclang, -std=c++17] }
+      openmp_flag: -Kopenmp
+      common_flags: [-Kfast, -I.]
+    frtpx:
+      f90: { cmd: frtpx, flags: [-Cpp] }
+      openmp_flag: -Kopenmp
+      common_flags: [-Kfast, -I.]
+      fortran_module_flag: "-Mmod"
+      fortran_include_flag: "-Imod"
+
+gpu:
+  # Wisteria は NVHPC 24.1 系のため、古い -gpu=managed 文法を使用
+  common_flags: ["-tp=native", "-O3", "-I.", "-Wall", "-Minfo=accel,opt,mp"]
+  compiler:
+    cc:  { cmd: nvc,       flags: [] }
+    cxx: { cmd: nvc++,     flags: [-std=c++17] }
+    f90: { cmd: nvfortran, flags: [-cpp] }
+  memory_models:
+    managed:  "-gpu=managed"
+    separate: "-gpu=nomanaged"
+  fortran_module_flag: "-module mod"
+  fortran_include_flag: "-Imod"
+
+# ジョブスクリプト生成用 (Wisteria は PJM = Fujitsu Job Manager)
+job:
+  scheduler: pjm
+  submit_cmd: pjsub
+  status_cmd: pjstat
+  default_group: gr52
+  default_walltime: "00:10:00"
+  # mode → リソースグループ (Aquarius=GPU node、Odyssey=A64FX CPU node)
+  # modules はジョブスクリプト生成時に「推奨例」コメントとして出るのみ。自動 load されない。
+  # 実際の module load はユーザがビルド env と合わせて手動で行う。
+  per_mode:
+    gpu: { queue: debug-a, omp_threads: 72, modules: ["nvidia", "hdf5/1.14.6", "boost/1.83"] }
+    cpu: { queue: debug-o, omp_threads: 48, modules: ["gcc/12.2.0", "hdf5/1.14.6", "boost/1.83"] }
+  env:
+    - "OMP_PROC_BIND=spread"
+    - "OMP_PLACES=threads"
+
+kokkos:
+  root: /xxx/kokkos/5.0.2/
+  cxx_standard: 17

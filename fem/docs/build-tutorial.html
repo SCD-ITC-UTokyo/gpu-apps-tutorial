@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>fem ビルドチュートリアル</title>
+<style>
+  :root {
+    --fg: #222;
+    --muted: #666;
+    --bg: #fff;
+    --code-bg: #f6f8fa;
+    --code-fg: #24292e;
+    --border: #d0d7de;
+    --accent: #0969da;
+    --link: #0969da;
+    --note-bg: #f6f8fa;
+    --note-border: #d0d7de;
+    --warn-bg: #fff8c5;
+    --warn-border: #d4a72c;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+                 "Yu Gothic UI", "Meiryo", sans-serif;
+    line-height: 1.7;
+    color: var(--fg);
+    background: var(--bg);
+    margin: 0;
+    padding: 0;
+  }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 1.5rem 2rem;
+  }
+  header h1 { margin: 0; font-size: 1.6rem; font-weight: 600; }
+  header .subtitle { color: var(--muted); margin-top: 0.4rem; font-size: 0.95rem; }
+  header .breadcrumb {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-bottom: 0.6rem;
+  }
+  header .breadcrumb a { color: var(--muted); }
+
+  nav.toc {
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    padding: 0.6rem 2rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  nav.toc a {
+    color: var(--link);
+    text-decoration: none;
+    margin-right: 1.2rem;
+    font-size: 0.88rem;
+  }
+  nav.toc a:hover { text-decoration: underline; }
+
+  main {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 1.5rem 2rem 3rem;
+  }
+
+  section {
+    margin: 2.5rem 0;
+    scroll-margin-top: 60px;
+  }
+
+  h2 {
+    font-size: 1.35rem;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.4rem;
+    margin: 2.5rem 0 1rem;
+  }
+  h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 1.5rem 0 0.6rem;
+  }
+  h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 1rem 0 0.4rem;
+  }
+
+  p { margin: 0.6rem 0; }
+  ul, ol { padding-left: 1.8rem; margin: 0.5rem 0; }
+  li { margin: 0.2rem 0; }
+
+  /* インラインコード */
+  :not(pre) > code {
+    background: var(--code-bg);
+    color: var(--code-fg);
+    padding: 0.15em 0.45em;
+    border-radius: 4px;
+    font-family: "SFMono-Regular", "Consolas", "Liberation Mono", "Menlo", monospace;
+    font-size: 0.88em;
+    border: 1px solid var(--border);
+  }
+
+  /* コードブロック (区別がはっきり分かる枠 + コピーボタン) */
+  .code-block {
+    position: relative;
+    margin: 1rem 0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--code-bg);
+    overflow: hidden;
+  }
+  .code-block .code-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.3rem 0.6rem 0.3rem 0.8rem;
+    font-size: 0.75rem;
+    color: var(--muted);
+    background: #eef1f4;
+    border-bottom: 1px solid var(--border);
+  }
+  .code-block .code-label {
+    text-transform: lowercase;
+    letter-spacing: 0.04em;
+    font-weight: 500;
+  }
+  .code-block button.copy-btn {
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--fg);
+    padding: 2px 9px;
+    border-radius: 4px;
+    font-size: 0.74rem;
+    font-family: inherit;
+  }
+  .code-block button.copy-btn:hover { background: #f0f0f0; }
+  .code-block button.copy-btn.copied { color: #1a7f37; border-color: #2da44e; }
+  .code-block pre {
+    margin: 0;
+    padding: 0.85rem 1rem;
+    overflow-x: auto;
+    font-family: "SFMono-Regular", "Consolas", "Liberation Mono", "Menlo", monospace;
+    font-size: 0.86rem;
+    line-height: 1.5;
+    color: var(--code-fg);
+  }
+  .code-block pre code {
+    background: none;
+    padding: 0;
+    border: none;
+    font: inherit;
+    color: inherit;
+  }
+
+  /* テーブル */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.92rem;
+  }
+  th, td {
+    text-align: left;
+    padding: 0.5rem 0.7rem;
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    background: var(--code-bg);
+    font-weight: 600;
+  }
+  tr:last-child td { border-bottom: none; }
+
+  /* 注釈ボックス (シンプル) */
+  .note {
+    border-left: 3px solid var(--accent);
+    background: var(--note-bg);
+    padding: 0.7rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+  }
+  .note p:first-child { margin-top: 0; }
+  .note p:last-child { margin-bottom: 0; }
+  .note .label {
+    font-weight: 600;
+    margin-right: 0.4rem;
+  }
+  .note.warn {
+    border-left-color: var(--warn-border);
+    background: var(--warn-bg);
+  }
+
+  /* ステップ番号 */
+  .step {
+    margin: 1.2rem 0;
+  }
+  .step h4 {
+    margin: 0 0 0.4rem;
+  }
+  .step h4::before {
+    content: counter(step-counter) ".";
+    counter-increment: step-counter;
+    color: var(--accent);
+    margin-right: 0.4em;
+    font-weight: 600;
+  }
+  .steps-wrap { counter-reset: step-counter; }
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 1.5rem 2rem;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  /* リンクの色 */
+  a { color: var(--link); }
+
+  /* 詳細折りたたみ */
+  details {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin: 0.5rem 0;
+    padding: 0.5rem 0.8rem;
+    background: var(--bg);
+  }
+  details > summary {
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--accent);
+  }
+  details[open] > summary { margin-bottom: 0.5rem; }
+
+  /* 強調 (キーワード) */
+  .key { font-weight: 600; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="breadcrumb">
+    <a href="../README.md">apps/fem/README.md</a> &raquo; docs/build-tutorial.html
+  </div>
+  <h1>fem ビルドチュートリアル</h1>
+  <p class="subtitle">3D 有限要素法 (FEM) 教材を、ビジュアル版で読むためのガイド</p>
+</header>
+
+<nav class="toc">
+  <a href="#learn">学べること</a>
+  <a href="#quickstart">5 分で動かす</a>
+  <a href="#dir">ディレクトリ</a>
+  <a href="#naming">variant 命名</a>
+  <a href="#build-stdpar">ビルド例 (stdpar)</a>
+  <a href="#build-kokkos">ビルド例 (Kokkos)</a>
+  <a href="#configure">configure.py</a>
+  <a href="#perf">性能評価</a>
+  <a href="#errors">エラー</a>
+  <a href="#trouble">困ったとき</a>
+</nav>
+
+<main>
+
+<!-- ====================================================================== -->
+<section id="learn">
+<h2>このアプリで学べること</h2>
+<p>
+OpenMP 経験者が GPU プログラミングモデルを横断的に学べるよう、
+<span class="key">同じ FEM 問題</span> (CG (共役勾配法) で線形方程式 Au = b) を 5 つの方式で実装しています。
+各 impl は <span class="key">pragma 1〜3 行レベルの違い</span> で済むようコードを揃えています。
+</p>
+
+<table>
+<thead><tr><th>方式</th><th>C/C++</th><th>Fortran</th><th>特徴</th></tr></thead>
+<tbody>
+<tr><td>OpenMP CPU</td><td>✓ (C)</td><td>✓</td><td>OpenMP の伝統的な CPU 並列。出発点</td></tr>
+<tr><td>OpenMP target</td><td>✓ (C)</td><td>✓</td><td><code>omp target</code> で GPU 化 (移行コスト最小)</td></tr>
+<tr><td>OpenACC</td><td>✓ (C)</td><td>✓</td><td><code>acc kernels</code>。NVIDIA 中心</td></tr>
+<tr><td>言語標準 stdpar</td><td>✓ (C++)</td><td>—</td><td>C++17 <code>std::execution::par</code>。pragma 不要</td></tr>
+<tr><td>言語標準 do concurrent</td><td>—</td><td>✓</td><td>Fortran 2008 <code>do concurrent</code></td></tr>
+<tr><td>Kokkos</td><td>✓ (C++)</td><td>—</td><td>C++ ライブラリ。CPU/GPU portability</td></tr>
+</tbody>
+</table>
+
+<p><code>C/C++</code> 列のカッコ内は実際のソース言語: openmp-cpu/openmp-target/openacc は <span class="key">C コード</span> (<code>.c</code>)、stdpar と Kokkos は <span class="key">C++ コード</span> (<code>.cpp</code>)。
+ディレクトリ名 <code>C++/</code> は両者をまとめる「C/C++ コンパイラで処理できる言語ディレクトリ」の意味で、実体は C と C++ の混在です。</p>
+
+<div class="note">
+<p><span class="label">教材スコープ:</span>
+精度は <code>FP32</code> / <code>FP64</code> のみ。混合精度 (FP16/BF16/tensor cores) は対象外です。</p>
+</div>
+</section>
+
+<!-- ====================================================================== -->
+<section id="quickstart">
+<h2>はじめての方へ (5 分で動かす)</h2>
+
+<h3>必要なもの</h3>
+<table>
+<thead><tr><th>項目</th><th>必須/任意</th><th>備考</th></tr></thead>
+<tbody>
+<tr><td>Linux (Ubuntu 24.04 で検証)</td><td>必須</td><td>WSL2 でも可</td></tr>
+<tr><td>NVIDIA HPC SDK (NVHPC) 24.1 以降</td><td>必須 (GPU 系)</td><td>OpenMP target / OpenACC / stdpar / do-concurrent に</td></tr>
+<tr><td>CMake 3.20 以降</td><td>必須</td><td><code>apt install cmake</code></td></tr>
+<tr><td>Python 3.8 以降 + PyYAML</td><td>必須</td><td><code>pip install pyyaml</code></td></tr>
+<tr><td>Kokkos 4.x / 5.x</td><td>任意</td><td>Kokkos 実装を試したい場合 (spack 推奨)</td></tr>
+</tbody>
+</table>
+
+<h3>最短経路 (ローカル GPU で OpenMP target を動かす)</h3>
+
+<div class="steps-wrap">
+
+<div class="step">
+<h4>fem ディレクトリに移動</h4>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>cd apps/fem</code></pre>
+</div>
+</div>
+
+<div class="step">
+<h4>構成を生成 (CMake ファイルを作る)</h4>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>./configure.py --variant C++/openmp-target/auto.def --machine local --mode gpu</code></pre>
+</div>
+</div>
+
+<div class="step">
+<h4>ビルドディレクトリに移動してビルド</h4>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>cd C++/openmp-target/auto.def
+cmake -B build-local-gpu -S .
+cmake --build build-local-gpu</code></pre>
+</div>
+</div>
+
+<div class="step">
+<h4>実行 (引数は INPUT.DAT のパス)</h4>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>./build-local-gpu/fem.gpu.32 ../../input/INPUT.DAT</code></pre>
+</div>
+
+<p>引数 <code>64</code> は <span class="key">N (= nx × ny × nz の N、つまり 64×64×64 立方体)</span>
+を指定します (<code>./binary 64</code> で 262,144 格子点)。</p>
+
+<p>標準出力例 (CSV、10 カラム):</p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">output</span><button class="copy-btn">コピー</button></div>
+<pre><code># binary,NP(=node_count),time_sec,performance_gflops,error,real_sec,user_sec,sys_sec,num_time_steps_logged,last_sim_time
+./build-local-gpu/fem.gpu.32,262144, 6.685e-02, 4.176e+01, 1.214e-05, 2.118e-01, 7.210e-02, 1.018e-01, 8192, 2.000e+00</code></pre>
+</div>
+</div>
+
+</div>
+
+<div class="note">
+<p><span class="label">うまく動いたら:</span>
+<a href="#build-stdpar">ビルド方法 (stdpar 例)</a> や
+<a href="#build-kokkos">ビルド方法 (Kokkos 例)</a> でほかの実装を試しましょう。
+動かない場合は <a href="#trouble">困ったとき</a> へ。</p>
+</div>
+</section>
+
+<!-- ====================================================================== -->
+<section id="dir">
+<h2>ディレクトリ構成</h2>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">tree</span><button class="copy-btn">コピー</button></div>
+<pre><code>apps/fem/
+├── README.md
+├── app.yaml                       # アプリのメタ情報
+├── implementations.yaml           # impl × variant の軸定義
+├── configure.py                   # ビルド構成生成器
+├── machines/
+│   ├── miyabi.yaml                # 東大 Miyabi (PBS, Intel/NVHPC 24.5+)
+│   ├── wisteria.yaml              # 東大 Wisteria (PJM, GCC/FCCpx/NVHPC 24.1)
+│   └── local.yaml                 # ローカル開発機
+├── C++/
+│   ├── openmp-cpu/                # C コード (.c)
+│   ├── openacc/{auto.def,...}/    # C コード (.c)
+│   ├── openmp-target/{auto.def,...}/  # C コード (.c)
+│   ├── stdpar/{auto.def, auto.opt}/   # C++ コード (.cpp) + STL
+│   └── kokkos/
+│       ├── range/{baseline, cpu-sweep, uvm, uvm-sweep, baseline-fused, uvm-fused}/
+│       ├── mdrange/{baseline, cpu-tile-sweep, uvm, uvm-tile-sweep}/
+│       └── team/{baseline, cpu-chunk-sweep, uvm, uvm-chunk-sweep}/
+├── F/
+│   ├── openmp-cpu/
+│   ├── openacc/{auto.def, ...}/
+│   ├── openmp-target/{auto.def, ...}/
+│   └── do-concurrent/{auto.def, auto.opt}/
+├── results/                       # 読者の実行結果 (空)
+└── summary/                       # 既測の公開データ + 可視化
+    ├── fem.csv              # 統合データ (Kokkos + 非 Kokkos)
+    ├── fem_dashboard.html   # インタラクティブ可視化
+    ├── visualize.py               # ダッシュボード生成器
+    └── docs/</code></pre>
+</div>
+
+<div class="note">
+<p><span class="label">注:</span>
+<code>C++/</code> ディレクトリは <span class="key">C コード (.c)</span> と
+<span class="key">C++ コード (.cpp)</span> の両方を含みます。
+C++ コンパイラ (nvc++, g++, icpx) は両方を処理できるので一つのディレクトリに統合しています。
+言語別の内訳: C = openmp-cpu, openmp-target, openacc; C++ = stdpar, kokkos。</p>
+</div>
+</section>
+
+<!-- ====================================================================== -->
+<section id="naming">
+<h2>variant 命名の意味</h2>
+<p><code>&lt;lang&gt;/&lt;impl&gt;/&lt;variant&gt;</code> の階層 (Kokkos のみ 4 階層):</p>
+
+<table>
+<thead><tr><th>軸</th><th>値</th><th>意味</th></tr></thead>
+<tbody>
+<tr><td rowspan="2">&lt;lang&gt;</td><td><code>C++</code> (ディレクトリ名)</td><td><span class="key">C/C++ ソース</span> (.c, .cpp) — C++ コンパイラで処理する言語ディレクトリ</td></tr>
+<tr><td><code>F</code></td><td>Fortran ソース (.f90)</td></tr>
+<tr><td rowspan="6">&lt;impl&gt;</td><td><code>openmp-cpu</code></td><td>OpenMP CPU マルチコア (ベースライン)</td></tr>
+<tr><td><code>openmp-target</code></td><td>OpenMP target offloading (5.0+)</td></tr>
+<tr><td><code>openacc</code></td><td>OpenACC</td></tr>
+<tr><td><code>stdpar</code></td><td>C++ 言語標準 (<code>std::execution::par</code>)</td></tr>
+<tr><td><code>do-concurrent</code></td><td>Fortran 言語標準 (<code>do concurrent</code>)</td></tr>
+<tr><td><code>kokkos</code></td><td>Kokkos (C++ のみ、4 階層命名)</td></tr>
+<tr><td rowspan="4">&lt;variant&gt; (非 Kokkos)</td><td><code>auto.def</code></td><td>自動メモリ管理 (managed) + デフォルト並列度</td></tr>
+<tr><td><code>auto.opt</code></td><td>managed + <code>NTHREADS=128</code> (omp-target/openacc のみ実効)</td></tr>
+<tr><td><code>manu.def</code></td><td>手動メモリ管理 (separate)</td></tr>
+<tr><td><code>manu.opt</code></td><td>separate + <code>NTHREADS=128</code></td></tr>
+<tr><td colspan="2"><code>&lt;policy&gt;/&lt;sub&gt;</code> (Kokkos)</td><td>policy = range/mdrange/team、sub = baseline/uvm/cpu-tile-sweep 等</td></tr>
+</tbody>
+</table>
+
+<p>注: <code>openmp-cpu</code> は variant 階層を持たず (<code>&lt;lang&gt;/openmp-cpu/src/</code> 直下にソース)、
+<code>stdpar</code> と <code>do-concurrent</code> は <code>auto.def</code> / <code>auto.opt</code> のみ。</p>
+</section>
+
+<!-- ====================================================================== -->
+<section id="build-stdpar">
+<h2>ビルド方法 (例: Miyabi で C++ stdpar の GPU unified memory)</h2>
+<p>1 つの具体例で完結。同じパターンを他の variant/machine/mode にも適用できます。</p>
+
+<div class="steps-wrap">
+
+<div class="step">
+<h4>構成生成</h4>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>cd apps/fem
+./configure.py --variant C++/stdpar/auto.def --machine miyabi --mode uni</code></pre>
+</div>
+
+<p>標準出力例:</p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">output</span><button class="copy-btn">コピー</button></div>
+<pre><code>Generated: C++/stdpar/auto.def/CMakeLists.txt
+
+--- Build configuration ---
+  variant       : C++/stdpar/auto.def
+  machine       : miyabi  (東大 Miyabi (PBS Pro、Miyabi-G=GH200/NVHPC 24.5+、Miyabi-C=Intel Xeon))
+  mode          : uni  (gpu=GPU offload, cpu=CPU OpenMP, uni=GPU unified memory)
+  language      : cpp (C++)
+  implementation: stdpar
+  compiler      : nvhpc  (nvc / nvc++ / nvfortran)
+  build system  : cmake
+  precision     : FP=32 (default; cmake -DFP=64 で double 精度に変更可)
+  opt level     : -O3  (machine yaml の common_flags 由来; --opt-level で上書き可)
+  variant tuning: (variant 固有の最適化なし)
+  memory model  : unified  (Unified memory (NVHPC unified))
+  target binary : fem.uni.&lt;FP&gt;
+  sources       : allocate.c ... test1.c (13 files)</code></pre>
+</div>
+</div>
+
+<div class="step">
+<h4>CMake ビルド (default、推奨)</h4>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>cd C++/stdpar/auto.def
+cmake -B build-miyabi-uni -S .
+cmake --build build-miyabi-uni</code></pre>
+</div>
+
+<p>標準出力例 (build 部):</p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">output</span><button class="copy-btn">コピー</button></div>
+<pre><code>-- Configuring done (0.2s)
+[ 25%] Building CXX object .../test1.cpp.o
+[ 50%] Building CXX object .../solver_CG.cpp.o
+[ 75%] Building CXX object .../allocate.cpp.o
+[100%] Linking CXX executable fem.uni.32
+[100%] Built target fem</code></pre>
+</div>
+</div>
+
+<div class="extra">
+<h4>Make ビルドする場合 (<code>--build make</code> 指定時)</h4>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>./configure.py --variant C++/stdpar/auto.def --machine miyabi --mode uni --build make
+cd C++/stdpar/auto.def
+make -f Makefile.gen.miyabi.uni</code></pre>
+</div>
+</div>
+
+<div class="step">
+<h4>実行 (ジョブスクリプトを投入)</h4>
+<p>Miyabi はバッチジョブ専用 (PBS Pro)。<code>configure.py</code> が <code>run.miyabi.uni.sh</code> を <span class="key">自動生成</span>するので、課金グループを書き換えて <code>qsub</code> で投入するだけです。以下は生成されるスクリプトの中身 (machine yaml の <code>job:</code> ブロックから組み立て):</p>
+
+<div class="code-block">
+  <div class="code-header"><span class="code-label">run.miyabi.uni.sh (自動生成)</span><button class="copy-btn">コピー</button></div>
+<pre><code>#!/bin/bash
+#PBS -q debug-g
+#PBS -l select=1:ompthreads=72
+#PBS -l walltime=00:10:00
+#PBS -W group_list=xxx       # ← 自分の課金グループに変更
+#PBS -j oe
+
+module purge
+module load nvidia/25.9
+module list
+
+cd ${PBS_O_WORKDIR}
+
+export OMP_PROC_BIND=spread
+export OMP_PLACES=threads
+
+./build-miyabi-uni/fem.uni.32 ../../input/INPUT.DAT</code></pre>
+</div>
+
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>qsub run.miyabi.uni.sh         # ジョブ投入
+qstat -u $USER                 # 状態確認
+# 完了後、run.miyabi.uni.sh.o&lt;jobid&gt; に標準出力が書き出される</code></pre>
+</div>
+
+<div class="note">
+<p><span class="label">Wisteria の場合:</span>
+スケジューラは PJM (Fujitsu)。ディレクティブは <code>#PJM -L rscgrp=debug-a</code> / <code>#PJM -L node=1</code> / <code>#PJM --omp thread=72</code> / <code>#PJM -L elapse=00:10:00</code> / <code>#PJM -g xxx</code> / <code>#PJM -j</code>。投入コマンドは <code>pjsub run.wisteria.uni.sh</code>、状態確認は <code>pjstat</code>。</p>
+</div>
+
+<p>ジョブ出力ファイル (<code>*.o&lt;jobid&gt;</code>) の中身は 10 カラム CSV:</p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">output</span><button class="copy-btn">コピー</button></div>
+<pre><code># binary,NP(=node_count),time_sec,performance_gflops,error,real_sec,user_sec,sys_sec,num_time_steps_logged,last_sim_time
+./build-miyabi-uni/fem.uni.32,262144, 6.685e-02, 4.176e+01, 1.214e-05, 2.118e-01, 7.210e-02, 1.018e-01, 8192, 2.000e+00</code></pre>
+</div>
+
+<p>出力フィールド:</p>
+<table>
+<thead><tr><th>カラム</th><th>内容</th><th>単位</th></tr></thead>
+<tbody>
+<tr><td>binary</td><td>実行バイナリのパス</td><td>string</td></tr>
+<tr><td>NP</td><td><strong>節点数 (DOF) — mesh で決まる (cube.0 = 274625)</strong></td><td>int</td></tr>
+<tr><td>time_sec</td><td>CG ソルバ計算時間</td><td>秒</td></tr>
+<tr><td>performance_gflops</td><td>演算性能 (FLOP / solver_time)</td><td>GFLOPS</td></tr>
+<tr><td>error</td><td><strong>CG 最終残差</strong> (収束時 ≤ INPUT.DAT の RESID 設定値)</td><td>float</td></tr>
+<tr><td>real_sec</td><td>プログラム全体の wall clock 時間</td><td>秒</td></tr>
+<tr><td>user_sec</td><td>user CPU 時間 (Fortran は cpu_time() 代用)</td><td>秒</td></tr>
+<tr><td>sys_sec</td><td>sys CPU 時間 (Fortran は 0.0 固定)</td><td>秒</td></tr>
+<tr><td>num_time_steps_logged</td><td><strong>CG 実反復回数 (ITERactual)</strong></td><td>int</td></tr>
+<tr><td>last_sim_time</td><td><strong>matrix assembly 時間</strong> (fem 特有: mat_sec)</td><td>秒</td></tr>
+</tbody>
+</table>
+
+<p><code>#</code> で始まる 1 行目は CSV のコメント行 (列名)。
+<code>awk '!/^#/'</code> や <code>pandas.read_csv(comment='#')</code> でデータ行だけ抽出できます。</p>
+</div>
+
+<div class="step">
+<h4>クリーンアップ</h4>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code># CMake
+rm -rf build-miyabi-uni
+
+# Make
+make -f Makefile.gen.miyabi.uni clean</code></pre>
+</div>
+</div>
+
+</div><!-- /steps-wrap -->
+</section>
+
+<!-- ====================================================================== -->
+<section id="build-kokkos">
+<h2>ビルド方法 (例: Miyabi で Kokkos)</h2>
+<p>Kokkos は C++ performance portability ライブラリで、<span class="key">ビルドは CMake 必須</span> (Make 非対応)。事前に Kokkos のインストールが必要。</p>
+
+<h3>前提: Kokkos のインストール (spack 例)</h3>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code># CUDA + OpenMP backend で Kokkos 5.0.2 をビルド (Miyabi GH200 の場合 cuda_arch=90)
+spack install kokkos +cuda +openmp +wrapper cuda_arch=90 cxxstd=17</code></pre>
+</div>
+
+<p>インストール先を <code>machines/miyabi.yaml</code> の <code>kokkos.root</code> に記述:</p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">yaml</span><button class="copy-btn">コピー</button></div>
+<pre><code># machines/miyabi.yaml
+kokkos:
+  root: /xxx/kokkos/5.0.2/              # 実機の Kokkos インストール先
+  cxx_standard: 17</code></pre>
+</div>
+
+<div class="steps-wrap">
+
+<div class="step">
+<h4>構成生成</h4>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>cd apps/fem
+./configure.py --variant C++/kokkos/range/baseline --machine miyabi --mode gpu</code></pre>
+</div>
+
+<p>標準出力例:</p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">output</span><button class="copy-btn">コピー</button></div>
+<pre><code>Generated: C++/kokkos/range/baseline/CMakeLists.txt
+
+--- Build configuration ---
+  variant       : C++/kokkos/range/baseline
+  machine       : miyabi  (東大 Miyabi (PBS Pro、Miyabi-G=GH200/NVHPC 24.5+、Miyabi-C=Intel Xeon))
+  mode          : gpu
+  language      : cpp (C++)
+  implementation: kokkos
+  compiler      : kokkos-managed
+  build system  : cmake
+  precision     : FP=32
+  policy        : range  (parallel_for (RangePolicy))
+  memory layout : default View
+  kokkos root   : /xxx/kokkos/5.0.2/
+  cxx_standard  : C++17
+  target binary : fem.gpu.&lt;FP&gt;</code></pre>
+</div>
+</div>
+
+<div class="step">
+<h4>CMake ビルド (Kokkos は cmake 強制)</h4>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>cd C++/kokkos/range/baseline
+cmake -B build-miyabi-gpu -S .
+cmake --build build-miyabi-gpu</code></pre>
+</div>
+
+<p>標準出力例:</p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">output</span><button class="copy-btn">コピー</button></div>
+<pre><code>-- Enabled Kokkos devices: OPENMP;CUDA
+-- kokkos_launch_compiler is enabled globally.
+-- Configuring done (0.3s)
+[ 25%] Building CXX object .../test1.cpp.o
+[ 50%] Building CXX object .../solver_CG.cpp.o
+[ 75%] Building CXX object .../allocate.cpp.o
+[100%] Linking CXX executable fem.gpu.32
+[100%] Built target fem</code></pre>
+</div>
+</div>
+
+<div class="step">
+<h4>実行 (ジョブスクリプトを投入)</h4>
+<p>Miyabi はバッチジョブ専用 (PBS Pro)。<code>configure.py</code> が <code>run.miyabi.gpu.sh</code> を <span class="key">自動生成</span>するので、課金グループを書き換えて <code>qsub</code> で投入します。生成されるスクリプトの中身:</p>
+
+<div class="code-block">
+  <div class="code-header"><span class="code-label">run.miyabi.gpu.sh (自動生成)</span><button class="copy-btn">コピー</button></div>
+<pre><code>#!/bin/bash
+#PBS -q debug-g
+#PBS -l select=1:ompthreads=72
+#PBS -l walltime=00:10:00
+#PBS -W group_list=xxx       # ← 自分の課金グループに変更
+#PBS -j oe
+
+module purge
+module load nvidia/25.9
+module list
+
+cd ${PBS_O_WORKDIR}
+
+export OMP_PROC_BIND=spread
+export OMP_PLACES=threads
+
+./build-miyabi-gpu/fem.gpu.32 ../../input/INPUT.DAT</code></pre>
+</div>
+
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>qsub run.miyabi.gpu.sh         # ジョブ投入
+qstat -u $USER                 # 状態確認</code></pre>
+</div>
+
+<div class="note">
+<p><span class="label">Wisteria の場合:</span>
+PJM (Fujitsu) スケジューラ。<code>#PJM -L rscgrp=debug-a</code> / <code>#PJM -L node=1</code> / <code>#PJM --omp thread=72</code> / <code>#PJM -L elapse=00:10:00</code> / <code>#PJM -g xxx</code> / <code>#PJM -j</code> を使い、投入は <code>pjsub run.wisteria.gpu.sh</code>。</p>
+</div>
+
+<p>ジョブ出力 (<code>*.o&lt;jobid&gt;</code>) の中身:</p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">output</span><button class="copy-btn">コピー</button></div>
+<pre><code># binary,NP(=node_count),time_sec,performance_gflops,error,real_sec,user_sec,sys_sec,num_time_steps_logged,last_sim_time
+./build-miyabi-gpu/fem.gpu.32,262144, 4.500e-02, 6.205e+02, 1.146e-05, 2.500e-01, 1.700e-01, 8.000e-02, 8192, 2.000e+00</code></pre>
+</div>
+</div>
+
+</div><!-- /steps-wrap -->
+
+<h3>Kokkos variant の選び方</h3>
+<table>
+<thead><tr><th>名前</th><th>policy</th><th>メモリ</th><th>特徴</th></tr></thead>
+<tbody>
+<tr><td><code>range/baseline</code></td><td>parallel_for (RangePolicy)</td><td>default</td><td>最もシンプル</td></tr>
+<tr><td><code>range/cpu-sweep</code></td><td>RangePolicy</td><td>default</td><td>compile flag sweep 用</td></tr>
+<tr><td><code>range/uvm</code></td><td>RangePolicy</td><td>CudaUVMSpace</td><td>UVM のオーバーヘッドを観察</td></tr>
+<tr><td><code>range/uvm-sweep</code></td><td>RangePolicy</td><td>CudaUVMSpace</td><td>UVM + sweep</td></tr>
+<tr><td><code>range/baseline-fused</code></td><td>RangePolicy</td><td>default</td><td>3 重ループを 1 重に融合</td></tr>
+<tr><td><code>range/uvm-fused</code></td><td>RangePolicy</td><td>CudaUVMSpace</td><td>UVM + 融合</td></tr>
+<tr><td><code>mdrange/baseline</code></td><td>MDRangePolicy</td><td>default</td><td>baseline (tile = default)</td></tr>
+<tr><td><code>mdrange/cpu-tile-sweep</code></td><td>MDRangePolicy</td><td>default</td><td><code>_NX/_NY/_NZ</code> マクロ</td></tr>
+<tr><td><code>mdrange/uvm</code></td><td>MDRangePolicy</td><td>CudaUVMSpace</td><td>—</td></tr>
+<tr><td><code>mdrange/uvm-tile-sweep</code></td><td>MDRangePolicy</td><td>CudaUVMSpace</td><td>UVM + tile</td></tr>
+<tr><td><code>team/baseline</code></td><td>TeamPolicy + TeamThreadRange</td><td>default</td><td>chunk = 32 ハードコード</td></tr>
+<tr><td><code>team/cpu-chunk-sweep</code></td><td>TeamPolicy</td><td>default</td><td><code>_CHUNK</code> マクロ</td></tr>
+<tr><td><code>team/uvm</code></td><td>TeamPolicy</td><td>CudaUVMSpace</td><td>—</td></tr>
+<tr><td><code>team/uvm-chunk-sweep</code></td><td>TeamPolicy</td><td>CudaUVMSpace</td><td>UVM + chunk</td></tr>
+</tbody>
+</table>
+
+<div class="note">
+<p><span class="label">RangePolicy について:</span>
+<code>range/*</code> の各 variant のソースには <code>RangePolicy</code> という文字列は現れず、<code>Kokkos::parallel_for("q", N, ...)</code> のようにループ長 (整数の節点数 N) を直接渡しています (内積などは <code>parallel_reduce</code>)。これでも実体はディレクトリ名どおり <strong>RangePolicy</strong> です — Kokkos は整数の extent を受け取ると内部で <code>Kokkos::RangePolicy&lt;&gt;(0, N)</code> に暗黙変換します (<code>parallel_for(N, f)</code> ≡ <code>parallel_for(RangePolicy&lt;&gt;(0, N), f)</code>)。<code>mdrange</code> の <code>MDRangePolicy</code> や <code>team</code> の <code>TeamPolicy</code> を明示構築するのと対照的に、これは「ポリシーを明示的に書かない最短記法」です。</p>
+</div>
+
+<div class="note">
+<p><span class="label">注:</span>
+UVM variant は GPU mode (または <code>uni</code>) 必須 (<code>CudaUVMSpace</code> は CUDA backend 要)。
+<code>--mode cpu</code> で UVM variant を指定すると <code>configure.py</code> がエラー終了します。</p>
+</div>
+
+<h3>tile / chunk sweep の例</h3>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code># tile sweep 例 (Kokkos mdrange)
+./configure.py --variant C++/kokkos/mdrange/cpu-tile-sweep --machine miyabi --mode gpu \
+    --tile-nx 4 --tile-ny 8 --tile-nz 64
+cd C++/kokkos/mdrange/cpu-tile-sweep
+cmake -B build-miyabi-gpu -S . && cmake --build build-miyabi-gpu
+
+# chunk sweep 例 (Kokkos team)
+./configure.py --variant C++/kokkos/team/cpu-chunk-sweep --machine miyabi --mode gpu --chunk 128
+cd C++/kokkos/team/cpu-chunk-sweep
+cmake -B build-miyabi-gpu -S . && cmake --build build-miyabi-gpu</code></pre>
+</div>
+</section>
+
+<!-- ====================================================================== -->
+<section id="configure">
+<h2>configure.py の使い方</h2>
+<p><code>configure.py</code> は variant / machine / mode を受け取って variant ディレクトリに 2 種のファイルを生成します:</p>
+<ol>
+  <li><strong>ビルドファイル</strong>: <code>CMakeLists.txt</code> (default) または <code>Makefile.gen.&lt;machine&gt;.&lt;mode&gt;</code></li>
+  <li><strong>ジョブスクリプト</strong> <code>run.&lt;machine&gt;.&lt;mode&gt;.sh</code> — machine yaml の <code>job:</code> ブロックから自動生成 (Miyabi → PBS Pro <code>qsub</code>、Wisteria → PJM <code>pjsub</code>、local → 直接 bash)</li>
+</ol>
+
+<h3>基本コマンド</h3>
+<p>各例ごとにコピーボタンを用意しています。</p>
+
+<p><strong>ヘルプ</strong></p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>./configure.py --help</code></pre>
+</div>
+
+<p><strong>使える variant / machine の一覧</strong></p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>./configure.py --list</code></pre>
+</div>
+
+<p><strong>設定の一覧表示</strong> &nbsp;<span style="color:var(--muted);font-size:0.85em;">(3 階層: 全体 → machine 別 → variant 別)</span></p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>./configure.py --info</code></pre>
+</div>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>./configure.py --info --machine miyabi</code></pre>
+</div>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>./configure.py --info --variant C++/openacc/auto.opt --machine local --mode gpu</code></pre>
+</div>
+
+<p><strong>例: ローカル機の GPU で OpenMP target をビルド</strong> &nbsp;<span style="color:var(--muted);font-size:0.85em;">(CMake、default)</span></p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>./configure.py --variant C++/openmp-target/auto.def --machine local --mode gpu</code></pre>
+</div>
+
+<p><strong>例: Wisteria CPU で Fortran OpenMP CPU をビルド</strong> &nbsp;<span style="color:var(--muted);font-size:0.85em;">(GCC を明示、Make 指定)</span></p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>./configure.py --variant F/openmp-cpu --machine wisteria --mode cpu --compiler gcc --build make</code></pre>
+</div>
+
+<p><strong>例: Miyabi で C++ stdpar の GPU unified memory ビルド</strong></p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>./configure.py --variant C++/stdpar/auto.def --machine miyabi --mode uni</code></pre>
+</div>
+
+<p><strong>内容だけ確認 (ファイル書き込まない)</strong></p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>./configure.py --variant C++/openacc/auto.def --machine local --mode gpu --dry-run</code></pre>
+</div>
+
+<h3>引数の意味</h3>
+<table>
+<thead><tr><th>引数</th><th>必須</th><th>値</th><th>説明</th></tr></thead>
+<tbody>
+<tr><td><code>--variant</code></td><td>yes</td><td><code>C++/openmp-target/auto.def</code> 等</td><td>ビルドする variant のパス</td></tr>
+<tr><td><code>--machine</code></td><td>yes</td><td><code>local</code>/<code>miyabi</code>/<code>wisteria</code></td><td>対象マシン</td></tr>
+<tr><td><code>--mode</code></td><td>yes</td><td><code>gpu</code>/<code>cpu</code>/<code>uni</code></td><td>GPU offload / CPU OpenMP / unified memory</td></tr>
+<tr><td><code>--compiler</code></td><td>no</td><td><code>intel</code>/<code>gcc</code>/<code>fccpx</code>/<code>frtpx</code>/<code>nvhpc</code></td><td>CPU compiler 上書き (cpu mode のみ)</td></tr>
+<tr><td><code>--build</code></td><td>no</td><td><code>cmake</code> (default) / <code>make</code></td><td>ビルドシステム選択 (Kokkos は cmake 強制)</td></tr>
+<tr><td><code>--fp</code></td><td>no</td><td><code>32</code> / <code>64</code></td><td>浮動小数精度のデフォルト値</td></tr>
+<tr><td><code>--nthreads</code></td><td>no</td><td>int</td><td>NTHREADS デフォルト (opt variant のみ実効)</td></tr>
+<tr><td><code>--tile-nx/ny/nz</code></td><td>no</td><td>int</td><td>Kokkos mdrange tile-sweep の <code>_NX/_NY/_NZ</code></td></tr>
+<tr><td><code>--chunk</code></td><td>no</td><td>int</td><td>Kokkos team chunk-sweep の <code>_CHUNK</code></td></tr>
+<tr><td><code>--opt-level</code></td><td>no</td><td><code>O0</code>〜<code>O4</code>/<code>fast</code></td><td>ベース最適化レベル (非 Kokkos のみ)</td></tr>
+<tr><td><code>--extra-cflags</code></td><td>no</td><td>str</td><td>追加 compile flag (非 Kokkos のみ)</td></tr>
+<tr><td><code>--list</code></td><td>no</td><td>—</td><td>variant / machine 一覧</td></tr>
+<tr><td><code>--info</code></td><td>no</td><td>—</td><td>設定一覧 (3 階層)</td></tr>
+<tr><td><code>--dry-run</code></td><td>no</td><td>—</td><td>生成内容を stdout 表示</td></tr>
+</tbody>
+</table>
+
+<h3>オプションと variant の対応 (重要)</h3>
+<p>対応しない組み合わせを指定すると <code>configure.py</code> が <span class="key">ERROR で拒否</span>します:</p>
+
+<table>
+<thead><tr><th>オプション</th><th>非 Kokkos</th><th>Kokkos</th></tr></thead>
+<tbody>
+<tr><td><code>--fp</code></td><td>✓ 全 variant</td><td>✓ 全 variant</td></tr>
+<tr><td><code>--nthreads</code></td><td>✓ <code>auto.opt</code>/<code>manu.opt</code> の <code>omp-target</code>/<code>openacc</code> のみ</td><td>✗</td></tr>
+<tr><td><code>--tile-nx/ny/nz</code></td><td>✗</td><td>✓ <code>mdrange/*-tile-sweep</code> のみ</td></tr>
+<tr><td><code>--chunk</code></td><td>✗</td><td>✓ <code>team/*-chunk-sweep</code> のみ</td></tr>
+<tr><td><code>--opt-level</code></td><td>✓ 全 variant</td><td>✗ (Kokkos インストール時に決定)</td></tr>
+<tr><td><code>--extra-cflags</code></td><td>✓ 全 variant</td><td>✗ (Kokkos インストール時に決定)</td></tr>
+</tbody>
+</table>
+
+<h3>CLI オプション例 (精度・最適化を直接指定)</h3>
+<p>各例ごとにコピーボタンを用意しています。</p>
+
+<p><strong>倍精度 (FP=64) でビルド構成生成</strong> &nbsp;<span style="color:var(--muted);font-size:0.85em;">→ バイナリ名: <code>fem.gpu.64</code></span></p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>./configure.py --variant C++/openmp-target/auto.def --machine local --mode gpu --fp 64</code></pre>
+</div>
+
+<p><strong>NTHREADS=256 を default に</strong> &nbsp;<span style="color:var(--muted);font-size:0.85em;">→ バイナリ名: <code>fem.gpu.32.256</code></span></p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>./configure.py --variant C++/openacc/auto.opt --machine local --mode gpu --nthreads 256</code></pre>
+</div>
+
+<p><strong>倍精度 + NTHREADS の組み合わせ</strong> &nbsp;<span style="color:var(--muted);font-size:0.85em;">→ バイナリ名: <code>fem.gpu.64.256</code></span></p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>./configure.py --variant C++/openmp-target/auto.opt --machine local --mode gpu --fp 64 --nthreads 256</code></pre>
+</div>
+
+<p><strong>Kokkos tile sweep のデフォルト tile size を指定</strong></p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>./configure.py --variant C++/kokkos/mdrange/cpu-tile-sweep --machine local --mode gpu \
+    --tile-nx 4 --tile-ny 8 --tile-nz 64</code></pre>
+</div>
+
+<p><strong>Kokkos chunk sweep のデフォルト chunk size</strong></p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>./configure.py --variant C++/kokkos/team/cpu-chunk-sweep --machine local --mode gpu --chunk 256</code></pre>
+</div>
+
+<p><strong>ベース最適化レベルを変更</strong> &nbsp;<span style="color:var(--muted);font-size:0.85em;">(default: machine yaml の <code>-O3</code>)</span></p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>./configure.py --variant C++/openmp-target/auto.def --machine local --mode gpu --opt-level fast</code></pre>
+</div>
+
+<p><strong>arch / vector ext 等の任意フラグを追加</strong></p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>./configure.py --variant C++/openacc/auto.def --machine miyabi --mode cpu --compiler intel \
+    --opt-level O3 --extra-cflags="-march=sapphirerapids -funroll-loops"</code></pre>
+</div>
+
+<h3>machine 情報の自動検出 (local のみ)</h3>
+<p><code>--machine local</code> 指定時は、実行ホストから OS / CPU / GPU / NVHPC バージョンを自動検出して表示します。
+リモート機 (miyabi, wisteria) は yaml の <code>description</code> を使用 (ローカルから検出できないため)。</p>
+</section>
+
+<!-- ====================================================================== -->
+<section id="perf">
+<h2>性能評価 (ダッシュボード)</h2>
+
+<p>ビルドして実行した結果は <code>summary/fem.csv</code> に統合されており、
+<a href="../summary/fem_dashboard.html">ダッシュボード</a> からインタラクティブに閲覧できます。</p>
+
+<h3>ダッシュボードの主な機能</h3>
+<table>
+<thead><tr><th>機能</th><th>説明</th></tr></thead>
+<tbody>
+<tr><td>連動フィルタ</td><td>category / machine / mode / language / impl / variant / memory_model / optimization_type / fp の 10 軸</td></tr>
+<tr><td>件数表示</td><td>各フィルタ項目に該当行数 <code>(N)</code> を表示。0 件の項目は自動的に灰色化</td></tr>
+<tr><td>X/Y 軸選択</td><td><code>time_sec</code>, <code>performance_gflops</code>, <code>error</code>, <code>real_sec</code>, <code>N</code>, <code>nx</code> 等から自由選択</td></tr>
+<tr><td>色分け</td><td><code>impl</code>, <code>variant</code>, <code>memory_model</code>, <code>optimization_type</code> 等で系列を分けられる</td></tr>
+<tr><td>グラフ種別</td><td>散布図 / 折れ線 / 棒 / 箱ひげ / ヒストグラム</td></tr>
+<tr><td>対数軸切替</td><td>X/Y それぞれ線形/対数</td></tr>
+</tbody>
+</table>
+
+<h3>既測データの概要</h3>
+<table>
+<thead><tr><th>項目</th><th>値</th></tr></thead>
+<tbody>
+<tr><td>統合 CSV</td><td><code>summary/fem.csv</code> (168 KB、907 行)</td></tr>
+<tr><td>非 Kokkos 行</td><td>642 (mizuho 由来、Miyabi/Wisteria 実機計測)</td></tr>
+<tr><td>Kokkos 行</td><td>265</td></tr>
+<tr><td>grid サイズ N</td><td>非 Kokkos: nx=32/64/128/256/512、Kokkos: nx=128 のみ</td></tr>
+<tr><td>machine</td><td>miyabi, wisteria</td></tr>
+<tr><td>精度</td><td>FP=32 / FP=64</td></tr>
+<tr><td>impl 種類</td><td>openmp-cpu, openmp-target, openacc, stdpar, do-concurrent, kokkos (6 種)</td></tr>
+</tbody>
+</table>
+
+<h3>統合 CSV のカラム (18 列)</h3>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">csv columns</span><button class="copy-btn">コピー</button></div>
+<pre><code>category, machine, mode, language, impl, variant, memory_model,
+optimization_type, optimization_param, fp, N,
+time_sec, performance_gflops, error,
+real_sec, user_sec, sys_sec, source_file</code></pre>
+</div>
+<p>fem では mesh ファイル (cube.0) で問題サイズが決まるため、<code>nx/ny/nz</code> カラムは持ちません (<code>N</code> = NP のみ)。<code>real_sec/user_sec/sys_sec</code> は旧 mizuho ベンチでは未計測のため空、新しく test1.c で取得した行で実値が入ります。</p>
+
+<h3>ダッシュボードの典型的な使い方</h3>
+<table>
+<thead><tr><th>観察したいこと</th><th>操作</th></tr></thead>
+<tbody>
+<tr><td>全 impl の性能スケーリング (N→GFLOPS)</td><td>X=<code>N</code> (log), Y=<code>performance_gflops</code> (log), 色=<code>impl</code></td></tr>
+<tr><td>FP32 vs FP64 の精度比較</td><td>X=<code>fp</code>, Y=<code>error</code> (log), 色=<code>impl</code>, グラフ=箱ひげ</td></tr>
+<tr><td>mdrange の tile size の影響</td><td>filter=impl:kokkos + variant:mdrange/cpu-tile-sweep、X=<code>optimization_param</code>, Y=<code>performance_gflops</code></td></tr>
+<tr><td>machine 別の baseline 比較</td><td>filter=optimization_type:baseline、X=<code>impl</code>, Y=<code>performance_gflops</code>, グラフ=棒</td></tr>
+<tr><td>auto.def vs manu.def のメモリモデル効果</td><td>filter=variant:{auto.def, manu.def}、X=<code>N</code>, Y=<code>performance_gflops</code>, 色=<code>memory_model</code></td></tr>
+</tbody>
+</table>
+
+<h3>ダッシュボードの再生成</h3>
+<p>新しい計測データを <code>summary/fem.csv</code> に追加した後は、以下で HTML を再生成:</p>
+
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>cd apps/fem/summary
+python3 visualize.py
+# → fem_dashboard.html (同ディレクトリ) が更新される
+# ブラウザが自動で開く (失敗時は手動でファイルを開く)</code></pre>
+</div>
+
+<p>別の CSV / 出力先を指定:</p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>python3 apps/fem/summary/visualize.py path/to/data.csv path/to/dash.html</code></pre>
+</div>
+
+</section>
+
+<!-- ====================================================================== -->
+<section id="errors">
+<h2>エラー時の挙動</h2>
+<p><code>configure.py</code> は不整合を検出すると使用可能な選択肢を列挙して ERROR 終了します。</p>
+
+<table>
+<thead><tr><th>エラー</th><th>例 (一部)</th></tr></thead>
+<tbody>
+<tr><td>未登録 compiler</td><td><code>compiler 'intel' は machine 'wisteria' に定義されていない。使用可能: ['gcc', 'fccpx', 'frtpx']</code></td></tr>
+<tr><td>言語非対応 compiler</td><td><code>compiler 'fccpx' は Fortran をサポートしない。Fortran に使えるのは: ['gcc', 'frtpx']</code></td></tr>
+<tr><td>machine が mode 未サポート</td><td><code>mode 'uni' は machine 'wisteria' でサポートされない。使用可能: ['gpu', 'cpu']</code></td></tr>
+<tr><td>impl と mode の不整合</td><td><code>impl 'openmp-cpu' は mode 'gpu' でビルドできない。サポート: ['cpu']</code></td></tr>
+<tr><td>Kokkos UVM を CPU mode で</td><td><code>kokkos uvm variant (range/uvm) は GPU mode のみ</code></td></tr>
+<tr><td>Kokkos に make 指定</td><td><code>kokkos は CMake 強制 (--build cmake のみサポート)</code></td></tr>
+</tbody>
+</table>
+</section>
+
+<!-- ====================================================================== -->
+<section id="trouble">
+<h2>困ったとき (トラブルシューティング)</h2>
+
+<details>
+<summary><code>ERROR: PyYAML が必要です</code> と出る</summary>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>pip install pyyaml
+# またはシステムレベル
+sudo apt install python3-yaml</code></pre>
+</div>
+</details>
+
+<details>
+<summary><code>nvc++: command not found</code> / <code>nvfortran: command not found</code></summary>
+<p>NVIDIA HPC SDK のパスが通っていない。<code>~/.bashrc</code> に追加:</p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>export NVHPC_ROOT=/opt/nvidia/hpc_sdk/Linux_x86_64/&lt;version&gt;
+export PATH=$NVHPC_ROOT/compilers/bin:$PATH
+export LD_LIBRARY_PATH=$NVHPC_ROOT/compilers/lib:$LD_LIBRARY_PATH</code></pre>
+</div>
+<p>または modules システム: <code>module load nvhpc</code></p>
+</details>
+
+<details>
+<summary><code>cmake: command not found</code></summary>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>sudo apt install cmake
+# または
+pip install cmake</code></pre>
+</div>
+</details>
+
+<details>
+<summary><code>ERROR: insufficient number of input parameters</code></summary>
+<p>INPUT.DAT のパス引数を渡し忘れ:</p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>./build-local-gpu/fem.gpu.32 ../../input/INPUT.DAT    # ← この INPUT.DAT のパスが必須</code></pre>
+</div>
+</details>
+
+<details>
+<summary>計算結果が <code>NaN</code> や <code>inf</code> になる</summary>
+<p>FP32 で N が大きすぎる、あるいは dt 設定で発散している可能性。FP64 で再ビルドして確認:</p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code>cmake -B build-local-gpu-fp64 -S . -DFP=64
+cmake --build build-local-gpu-fp64
+./build-local-gpu-fp64/fem.gpu.64 64</code></pre>
+</div>
+</details>
+
+<details>
+<summary>GPU が認識されない / 遅すぎる</summary>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code># GPU 認識確認
+nvidia-smi
+
+# 実行時に GPU 使用を確認 (別端末)
+nvidia-smi -l 1
+
+# 実行時環境変数で GPU 詳細出力
+NVCOMPILER_ACC_NOTIFY=1 ./build-local-gpu/fem.gpu.32 128</code></pre>
+</div>
+<p>N が小さすぎると GPU を使い切れず CPU より遅いこともある。N=128 以上で再評価。</p>
+</details>
+
+<details>
+<summary>Kokkos の警告 <code>compute capability ... reduce performance</code></summary>
+<p>Kokkos インストール時の GPU arch と実機の arch が違う場合の警告。動作はする (互換モード)。気になる場合は Kokkos を実機の arch に合わせて再インストール:</p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
+<pre><code># 例: Blackwell (sm_120) 向け
+spack install kokkos +cuda +openmp +wrapper cuda_arch=120 cxxstd=20</code></pre>
+</div>
+</details>
+
+<details>
+<summary><code>compiler 'intel' は machine 'wisteria' に定義されていない</code></summary>
+<p>エラーメッセージに使用可能な選択肢が表示される。指示通り <code>--compiler gcc</code> 等で再実行。</p>
+</details>
+
+</section>
+
+</main>
+
+<footer>
+  <p>fem ビルドチュートリアル<br>
+  <code>apps/fem/docs/build-tutorial.html</code> &middot;
+  README: <a href="../README.md">apps/fem/README.md</a></p>
+</footer>
+
+<script>
+// コードブロックのコピーボタン
+document.querySelectorAll('.copy-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const pre = btn.closest('.code-block').querySelector('pre');
+    const text = pre.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      const original = btn.textContent;
+      btn.textContent = 'コピー済';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = original;
+        btn.classList.remove('copied');
+      }, 1200);
+    }).catch(() => {
+      // フォールバック (古いブラウザ)
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta);
+      btn.textContent = 'コピー済';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = 'コピー';
+        btn.classList.remove('copied');
+      }, 1200);
+    });
+  });
+});
+</script>
+
+</body>
+</html>

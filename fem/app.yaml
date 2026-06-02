@@ -1,0 +1,54 @@
+# fem アプリのメタ情報 (configure.py が参照)
+name: fem
+description: 3D 有限要素法 (FEM) ベンチマーク (CG ソルバ + 構造解析 / Stokes)
+
+# バイナリ名: {target}.{mode}.{fp}  例: fem.gpu.32, fem.cpu.64
+target: fem
+
+# ソースファイル (variant ディレクトリ src/ 内の相対パス)
+# - C/C++ 系 (openacc, openmp-target は .c のまま、stdpar/kokkos は .c → .cpp 自動変換)
+# - Fortran 系: モジュール依存順 (precision → pfem_util → pfem_fem_util → solver → 計算系 → test1)
+sources:
+  cpp:
+    - allocate.c
+    - define_file_name.c
+    - input_cntl.c
+    - input_grid.c
+    - mat_con0.c
+    - mat_con1.c
+    - mat_ass_bc.c
+    - mat_ass_main.c
+    - solver_CG.c
+    - solve11.c
+    - output_ucd.c
+    - util.c
+    - test1.c
+  f90:
+    - precision.f
+    - pfem_util.f
+    - pfem_fem_util.f
+    - solver_CG.f
+    - solve11.f
+    - input_cntl.f
+    - input_grid.f
+    - mat_ass_init.f
+    - mat_ass_bc.f
+    - mat_ass_main.f
+    - mat_con0.f
+    - mat_con1.f
+    - output_ucd.f
+    - util.f
+    - test1.f
+
+# 言語別ヘッダ (依存解析用)
+headers:
+  cpp:
+    - allocate.h
+    - pfem_util.h
+    - precision.h
+
+# 追加ライブラリ (FEM は math.h の sin/cos/sqrt 等を使用)
+libs: ["-lm"]
+
+# 浮動小数精度のデフォルト
+default_fp: 32

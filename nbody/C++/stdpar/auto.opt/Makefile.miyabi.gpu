@@ -1,0 +1,83 @@
+## default settings.
+FP_L     ?= 32
+FP_M     ?= 32
+BENCH    ?= 1
+
+## Compiler
+## NVIDIA Compiler version 24.1 or former
+#CXX = nvc++ -std=c++17 -stdpar=gpu -gpu=managed
+#CC  = nvc              -stdpar=gpu -gpu=managed
+#F90 = nvfortran -cpp   -stdpar=gpu -gpu=managed
+
+## NVIDIA Compiler version 24.5 or later
+CXX = nvc++ -std=c++17 -stdpar=gpu -gpu=mem:managed
+CC  = nvc              -stdpar=gpu -gpu=mem:managed
+F90 = nvfortran -cpp   -stdpar=gpu -gpu=mem:managed
+
+## Compile Options
+FLAGS = -tp=native -O3 -I. -Wall -Minfo=accel,opt,mp -Mfprelaxed=rsqrt
+FFLAGS = -Imod -module mod
+
+## Additional Macros
+FLAGS += -DSIMD_BITS=512 -DMEMORY_ALIGNMENT=64 -DNDEBUG -DCALCULATE_POTENTIAL
+
+# floating point type
+FLAGS += -DFP_L=$(FP_L) -DFP_M=$(FP_M) -DFP_H=64
+
+# for benchmarking
+ifeq ($(BENCH),1)
+FLAGS += -DBENCHMARK_MODE
+endif
+
+## Libraries
+LIBS =  -lboost_system -lboost_filesystem -lboost_program_options \
+	-lboost_timer -lboost_chrono -lhdf5
+
+## Additional C++ Library for Fortran90 Programs
+#LIBS += -lstdc++
+
+##---------------------------------------------------------------------------
+## Make rules
+ifeq ($(BENCH),1)
+TARGET = nbody.bench.gpu.$(FP_L).$(FP_M)
+else
+TARGET = nbody.gpu.$(FP_L).$(FP_M)
+endif
+
+OBJS = base/nbody.o
+
+all: show_config $(TARGET)
+
+.SUFFIXES:
+.SUFFIXES: .cpp .c .f90 .o
+
+%.o: %.c	
+	$(CC)  -c $(FLAGS) $< -o $@
+
+%.o: %.cpp
+	$(CXX) -c $(FLAGS) $< -o $@
+
+%.o: %.f90
+	mkdir -p mod
+	$(F90) -c $(FLAGS) $(FFLAGS) $< -o $@
+
+$(TARGET): $(OBJS)
+	$(CXX) $(OBJS) $(LIBS) -o $@
+#	$(CC)  $(OBJS) $(LIBS) -o $@
+#	$(F90) $(OBJS) $(LIBS) -o $@
+
+install: $(TARGET)
+	mkdir -p ../bin ../log ../dat
+	cp -f  $(TARGET) ../bin
+
+clean:
+	rm -f $(TARGET) */*.o */*~
+
+show_config:
+	@echo "======================================"
+	@echo "GPU FP_L=$(FP_L) FP_M=$(FP_M) BENCH=$(BENCH)"
+	@echo "======================================"
+
+base/nbody.o: \
+        common/cfg.hpp common/conservatives.hpp common/init.hpp common/io.hpp common/type.hpp \
+        util/hdf5.hpp util/timer.hpp

@@ -1,0 +1,232 @@
+======================================
+GPU FP=32 NTHREADS=512     
+======================================
+nvc              -mp=gpu -gpu=nomanaged  -c -tp=native -O3 -I. -Wall -Minfo=accel,opt,mp -DFP=32 -DNTHREADS=512 allocate.c -o allocate.o
+allocate_matrix:
+     40, Loop unrolled 4 times
+nvc              -mp=gpu -gpu=nomanaged  -c -tp=native -O3 -I. -Wall -Minfo=accel,opt,mp -DFP=32 -DNTHREADS=512 input_cntl.c -o input_cntl.o
+nvc              -mp=gpu -gpu=nomanaged  -c -tp=native -O3 -I. -Wall -Minfo=accel,opt,mp -DFP=32 -DNTHREADS=512 input_grid.c -o input_grid.o
+INPUT_GRID:
+     25, Loop unrolled 8 times
+     26, Loop unrolled 3 times (completely unrolled)
+nvc              -mp=gpu -gpu=nomanaged  -c -tp=native -O3 -I. -Wall -Minfo=accel,opt,mp -DFP=32 -DNTHREADS=512 mat_ass_bc.c -o mat_ass_bc.o
+MAT_ASS_BC:
+     23, Loop unrolled 2 times (completely unrolled)
+     29, #omp parallel
+         Loop unrolled 4 times
+     36, #omp parallel
+     50, #omp target teams distribute parallel for thread_limit(512)
+         50, Generating "nvkernel_MAT_ASS_BC_F1L50_4" GPU kernel
+             Loop parallelized across teams and threads(128), schedule(static)
+     50, Generating map(alloc:D[:NP],indexLU[:NP+1],IWKX[:NP*2],AMAT[:NPLU],B[:NP]) 
+     54, Memory zero idiom, loop replaced by call to __c_mzero4
+     65, #omp target teams distribute parallel for thread_limit(512)
+         43, Generating map(to:IWKX[:NP*2],itemLU[:NPLU],indexLU[:NP+1]) 
+         65, Generating "nvkernel_MAT_ASS_BC_F1L65_6" GPU kernel
+             Loop parallelized across teams and threads(128), schedule(static)
+     65, Generating map(alloc:AMAT[:NPLU],IWKX[:NP*2],itemLU[:NPLU],indexLU[:NP+1]) 
+nvc              -mp=gpu -gpu=nomanaged  -c -tp=native -O3 -I. -Wall -Minfo=accel,opt,mp -DFP=32 -DNTHREADS=512 mat_ass_main.c -o mat_ass_main.o
+MAT_ASS_MAIN:
+     33, FMA (fused multiply-add) instruction(s) generated
+     34, FMA (fused multiply-add) instruction(s) generated
+     60, FMA (fused multiply-add) instruction(s) generated
+     65, FMA (fused multiply-add) instruction(s) generated
+     69, FMA (fused multiply-add) instruction(s) generated
+     73, FMA (fused multiply-add) instruction(s) generated
+     77, FMA (fused multiply-add) instruction(s) generated
+     81, FMA (fused multiply-add) instruction(s) generated
+     85, FMA (fused multiply-add) instruction(s) generated
+     89, FMA (fused multiply-add) instruction(s) generated
+     93, FMA (fused multiply-add) instruction(s) generated
+     97, FMA (fused multiply-add) instruction(s) generated
+    110, FMA (fused multiply-add) instruction(s) generated
+    111, FMA (fused multiply-add) instruction(s) generated
+    114, FMA (fused multiply-add) instruction(s) generated
+    115, FMA (fused multiply-add) instruction(s) generated
+    118, FMA (fused multiply-add) instruction(s) generated
+    119, FMA (fused multiply-add) instruction(s) generated
+    123, FMA (fused multiply-add) instruction(s) generated
+    134, FMA (fused multiply-add) instruction(s) generated
+    135, FMA (fused multiply-add) instruction(s) generated
+    136, FMA (fused multiply-add) instruction(s) generated
+    137, FMA (fused multiply-add) instruction(s) generated
+    138, FMA (fused multiply-add) instruction(s) generated
+    139, FMA (fused multiply-add) instruction(s) generated
+    140, FMA (fused multiply-add) instruction(s) generated
+    141, FMA (fused multiply-add) instruction(s) generated
+    143, FMA (fused multiply-add) instruction(s) generated
+    144, FMA (fused multiply-add) instruction(s) generated
+    145, FMA (fused multiply-add) instruction(s) generated
+    146, FMA (fused multiply-add) instruction(s) generated
+    147, FMA (fused multiply-add) instruction(s) generated
+    148, FMA (fused multiply-add) instruction(s) generated
+    149, FMA (fused multiply-add) instruction(s) generated
+    150, FMA (fused multiply-add) instruction(s) generated
+    152, FMA (fused multiply-add) instruction(s) generated
+    153, FMA (fused multiply-add) instruction(s) generated
+    154, FMA (fused multiply-add) instruction(s) generated
+    155, FMA (fused multiply-add) instruction(s) generated
+    156, FMA (fused multiply-add) instruction(s) generated
+    157, FMA (fused multiply-add) instruction(s) generated
+    158, FMA (fused multiply-add) instruction(s) generated
+    275, #omp target teams distribute parallel for thread_limit(512)
+        275, Generating "nvkernel_MAT_ASS_MAIN_F1L275_2" GPU kernel
+             Loop parallelized across teams and threads(128), schedule(static)
+    275, Generating target enter data map(create: X[:NP],D[:NP],B[:NP],AMAT[:NPLU])
+         Generating map(alloc:AMAT[:NPLU]) 
+    282, #omp target teams distribute parallel for thread_limit(512)
+        282, Generating "nvkernel_MAT_ASS_MAIN_F1L282_4" GPU kernel
+             Loop parallelized across teams and threads(128), schedule(static)
+    282, Generating map(alloc:B[:NP],X[:NP],D[:NP]) 
+    294, Loop unrolled 2 times (completely unrolled)
+    295, Loop unrolled 2 times (completely unrolled)
+    296, Loop unrolled 2 times (completely unrolled)
+    366, #omp target teams distribute parallel for thread_limit(512)
+        345, Generating map(to:ELMCOLORindex[:NP+1],ELMCOLORitem[:ICELTOT],WEI[:],PNE[:32],ICELNOD[:ICELTOT*8],PNQ[:32],XYZ[:NP*3],itemLU[:NPLU],indexLU[:NP+1],SHAPE[:64],PNT[:32]) 
+        366, Generating "nvkernel_MAT_ASS_MAIN_F1L366_6" GPU kernel
+             Loop parallelized across teams and threads(128), schedule(static)
+    366, Generating map(alloc:D[:NP],ELMCOLORindex[:NP+1],ELMCOLORitem[:ICELTOT],WEI[:],PNE[:32],ICELNOD[:ICELTOT*8],PNQ[:32],X[:NP],itemLU[:NPLU],indexLU[:NP+1],SHAPE[:64],PNT[:32],AMAT[:NPLU],B[:NP],XYZ[:NP*3]) 
+          33, Loop unrolled 2 times (completely unrolled)
+          34, Loop unrolled 2 times (completely unrolled)
+    446, Loop unrolled 2 times (completely unrolled)
+         FMA (fused multiply-add) instruction(s) generated
+    447, Loop unrolled 2 times (completely unrolled)
+         FMA (fused multiply-add) instruction(s) generated
+    448, Loop unrolled 2 times (completely unrolled)
+         FMA (fused multiply-add) instruction(s) generated
+    459, FMA (fused multiply-add) instruction(s) generated
+    483, FMA (fused multiply-add) instruction(s) generated
+MAT_ASS_CLEAR:
+    506, Generating target exit data map(delete: X[:NP],D[:NP],B[:NP],AMAT[:NPLU]) finalize
+JACOBI:
+     22, Generating implicit omp declare target routine
+         Generating NVIDIA GPU code
+     33, Loop unrolled 2 times (completely unrolled)
+         FMA (fused multiply-add) instruction(s) generated
+     34, Loop unrolled 2 times (completely unrolled)
+         FMA (fused multiply-add) instruction(s) generated
+     65, FMA (fused multiply-add) instruction(s) generated
+     69, FMA (fused multiply-add) instruction(s) generated
+     73, FMA (fused multiply-add) instruction(s) generated
+     77, FMA (fused multiply-add) instruction(s) generated
+     81, FMA (fused multiply-add) instruction(s) generated
+     85, FMA (fused multiply-add) instruction(s) generated
+     89, FMA (fused multiply-add) instruction(s) generated
+     93, FMA (fused multiply-add) instruction(s) generated
+     97, FMA (fused multiply-add) instruction(s) generated
+    101, FMA (fused multiply-add) instruction(s) generated
+    111, FMA (fused multiply-add) instruction(s) generated
+    112, FMA (fused multiply-add) instruction(s) generated
+    115, FMA (fused multiply-add) instruction(s) generated
+    116, FMA (fused multiply-add) instruction(s) generated
+    119, FMA (fused multiply-add) instruction(s) generated
+    120, FMA (fused multiply-add) instruction(s) generated
+    134, FMA (fused multiply-add) instruction(s) generated
+    135, FMA (fused multiply-add) instruction(s) generated
+    136, FMA (fused multiply-add) instruction(s) generated
+    137, FMA (fused multiply-add) instruction(s) generated
+    138, FMA (fused multiply-add) instruction(s) generated
+    139, FMA (fused multiply-add) instruction(s) generated
+    140, FMA (fused multiply-add) instruction(s) generated
+    141, FMA (fused multiply-add) instruction(s) generated
+    143, FMA (fused multiply-add) instruction(s) generated
+    144, FMA (fused multiply-add) instruction(s) generated
+    145, FMA (fused multiply-add) instruction(s) generated
+    146, FMA (fused multiply-add) instruction(s) generated
+    147, FMA (fused multiply-add) instruction(s) generated
+    148, FMA (fused multiply-add) instruction(s) generated
+    149, FMA (fused multiply-add) instruction(s) generated
+    150, FMA (fused multiply-add) instruction(s) generated
+    152, FMA (fused multiply-add) instruction(s) generated
+    153, FMA (fused multiply-add) instruction(s) generated
+    154, FMA (fused multiply-add) instruction(s) generated
+    155, FMA (fused multiply-add) instruction(s) generated
+    156, FMA (fused multiply-add) instruction(s) generated
+    157, FMA (fused multiply-add) instruction(s) generated
+    158, FMA (fused multiply-add) instruction(s) generated
+    159, FMA (fused multiply-add) instruction(s) generated
+nvc              -mp=gpu -gpu=nomanaged  -c -tp=native -O3 -I. -Wall -Minfo=accel,opt,mp -DFP=32 -DNTHREADS=512 mat_con0.c -o mat_con0.o
+MAT_CON0:
+    104, Memory copy idiom, loop replaced by call to __c_mcopy4
+nvc              -mp=gpu -gpu=nomanaged  -c -tp=native -O3 -I. -Wall -Minfo=accel,opt,mp -DFP=32 -DNTHREADS=512 mat_con1.c -o mat_con1.o
+nvc              -mp=gpu -gpu=nomanaged  -c -tp=native -O3 -I. -Wall -Minfo=accel,opt,mp -DFP=32 -DNTHREADS=512 output_ucd.c -o output_ucd.o
+nvc              -mp=gpu -gpu=nomanaged  -c -tp=native -O3 -I. -Wall -Minfo=accel,opt,mp -DFP=32 -DNTHREADS=512 solve11.c -o solve11.o
+nvc              -mp=gpu -gpu=nomanaged  -c -tp=native -O3 -I. -Wall -Minfo=accel,opt,mp -DFP=32 -DNTHREADS=512 solver_CG.c -o solver_CG.o
+CG:
+     72, #omp target teams distribute parallel for thread_limit(512)
+         72, Generating "nvkernel_CG_F1L72_2" GPU kernel
+             Loop parallelized across teams and threads(128), schedule(static)
+     72, Generating map(alloc:ZW[:NP],itemLU[:NPLU],indexLU[:NP+1],RW[:NP],QW[:NP],X[:NP],PW[:NP],DW[:NP]) 
+     96, #omp target teams distribute parallel for thread_limit(512)
+         96, Generating "nvkernel_CG_F1L96_4" GPU kernel
+             Loop parallelized across teams and threads(128), schedule(static)
+     96, Generating map(alloc:X[:NP],itemLU[:NPLU],indexLU[:NP+1],DW[:NP],AMAT[:NPLU],RW[:NP],B[:NP],D[:NP]) 
+     99, FMA (fused multiply-add) instruction(s) generated
+    101, Loop unrolled 2 times
+         FMA (fused multiply-add) instruction(s) generated
+    102, FMA (fused multiply-add) instruction(s) generated
+    113, #omp target teams distribute parallel for thread_limit(512)
+        113, Generating "nvkernel_CG_F1L113_6" GPU kernel
+             Loop parallelized across teams and threads(128), schedule(static)
+             Generating reduction(+:BNRM2)
+    113, Generating map(alloc:B[:NP]) 
+         Generating map(tofrom:BNRM2) 
+    114, FMA (fused multiply-add) instruction(s) generated
+    135, #omp target teams distribute parallel for thread_limit(512)
+        135, Generating "nvkernel_CG_F1L135_8" GPU kernel
+             Loop parallelized across teams and threads(128), schedule(static)
+    135, Generating map(alloc:DW[:NP],ZW[:NP],RW[:NP]) 
+    149, #omp target teams distribute parallel for thread_limit(512)
+        149, Generating "nvkernel_CG_F1L149_10" GPU kernel
+             Loop parallelized across teams and threads(128), schedule(static)
+             Generating reduction(+:RHO)
+    149, Generating map(tofrom:RHO) 
+         Generating map(alloc:ZW[:NP],RW[:NP]) 
+    151, FMA (fused multiply-add) instruction(s) generated
+    164, #omp target teams distribute parallel for thread_limit(512)
+        164, Generating "nvkernel_CG_F1L164_12" GPU kernel
+             Loop parallelized across teams and threads(128), schedule(static)
+    164, Generating map(alloc:ZW[:NP],PW[:NP]) 
+    174, #omp target teams distribute parallel for thread_limit(512)
+        174, Generating "nvkernel_CG_F1L174_14" GPU kernel
+             Loop parallelized across teams and threads(128), schedule(static)
+    174, Generating map(alloc:ZW[:NP],PW[:NP]) 
+    176, FMA (fused multiply-add) instruction(s) generated
+    190, #omp target teams distribute parallel for thread_limit(512)
+        190, Generating "nvkernel_CG_F1L190_16" GPU kernel
+             Loop parallelized across teams and threads(128), schedule(static)
+    190, Generating map(alloc:QW[:NP],itemLU[:NPLU],indexLU[:NP+1],AMAT[:NPLU],D[:NP],PW[:NP]) 
+    193, Loop unrolled 2 times
+         FMA (fused multiply-add) instruction(s) generated
+    195, FMA (fused multiply-add) instruction(s) generated
+    211, #omp target teams distribute parallel for thread_limit(512)
+        211, Generating "nvkernel_CG_F1L211_18" GPU kernel
+             Loop parallelized across teams and threads(128), schedule(static)
+             Generating reduction(+:C1)
+    211, Generating map(tofrom:C1) 
+         Generating map(alloc:QW[:NP],PW[:NP]) 
+    213, FMA (fused multiply-add) instruction(s) generated
+    228, #omp target teams distribute parallel for thread_limit(512)
+        228, Generating "nvkernel_CG_F1L228_20" GPU kernel
+             Loop parallelized across teams and threads(128), schedule(static)
+    228, Generating map(alloc:X[:NP],RW[:NP],PW[:NP],QW[:NP]) 
+    230, FMA (fused multiply-add) instruction(s) generated
+    232, FMA (fused multiply-add) instruction(s) generated
+    240, #omp target teams distribute parallel for thread_limit(512)
+         62, Generating map(alloc:QW[:NP],RW[:NP],PW[:NP],DW[:NP],ZW[:NP]) 
+             Generating map(to:itemLU[:NPLU],indexLU[:NP+1]) 
+        240, Generating "nvkernel_CG_F1L240_22" GPU kernel
+             Loop parallelized across teams and threads(128), schedule(static)
+             Generating reduction(+:DNRM2)
+    240, Generating map(alloc:RW[:NP]) 
+         Generating map(tofrom:DNRM2) 
+    242, FMA (fused multiply-add) instruction(s) generated
+nvc              -mp=gpu -gpu=nomanaged  -c -tp=native -O3 -I. -Wall -Minfo=accel,opt,mp -DFP=32 -DNTHREADS=512 test1.c -o test1.o
+nvc              -mp=gpu -gpu=nomanaged  -c -tp=native -O3 -I. -Wall -Minfo=accel,opt,mp -DFP=32 -DNTHREADS=512 util.c -o util.o
+matconSORT:
+     42, Loop unrolled 2 times
+     47, Loop unrolled 8 times
+     61, Loop unrolled 2 times
+     68, Loop unrolled 2 times
+     74, Loop unrolled 8 times
+nvc              -mp=gpu -gpu=nomanaged  allocate.o input_cntl.o input_grid.o mat_ass_bc.o mat_ass_main.o mat_con0.o mat_con1.o output_ucd.o solve11.o solver_CG.o test1.o util.o  -o fem.gpu.32

@@ -1,0 +1,33 @@
+# diffusion アプリのメタ情報 (configure.py が参照)
+name: diffusion
+description: 3D 拡散方程式 (有限差分法)
+
+# バイナリ名: {target}.{mode}.{fp}  例: diffusion.gpu.32, diffusion.cpu.64
+# mode は configure.py --mode で指定 (gpu/cpu/uni)
+target: diffusion
+
+# ソースファイル (variant ディレクトリ src/ 内の相対パス)
+# 順序は OBJS の宣言順 (Fortran はモジュール依存解決のため重要):
+# misc → diffusion → main の順 (misc が他から使われる、main が最上位)
+sources:
+  cpp:
+    - misc.c
+    - diffusion.c
+    - main.c
+  f90:
+    - misc.f90
+    - diffusion.f90
+    - main.f90
+
+# 言語別ヘッダ (依存解析用、必要なら明示)
+headers:
+  cpp:
+    - diffusion.h
+    - misc.h
+
+# 追加ライブラリ (拡散方程式は math.h の sin/cos/exp/sqrt を使用)
+# NVHPC は自動リンクするが gcc/icx は明示が必要
+libs: ["-lm"]
+
+# 浮動小数精度のデフォルト (Makefile の FP ?= 32 と等価)
+default_fp: 32

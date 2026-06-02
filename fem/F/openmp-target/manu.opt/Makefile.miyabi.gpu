@@ -1,0 +1,92 @@
+## default settings.
+FP       ?= 32
+NTHREADS ?= 32
+
+## Compiler
+
+## NVIDIA Compiler version 24.1 or former
+#CXX = nvc++ -std=c++17 -mp=gpu -gpu=nomanaged
+#CC  = nvc              -mp=gpu -gpu=nomanaged
+#F90 = nvfortran -cpp   -mp=gpu -gpu=nomanaged
+
+## NVIDIA Compiler version 24.5 or later
+CXX = nvc++ -std=c++17 -mp=gpu -gpu=mem:separate
+CC  = nvc              -mp=gpu -gpu=mem:separate
+F90 = nvfortran -cpp   -mp=gpu -gpu=mem:separate
+
+## Compile Options
+FLAGS = -tp=native -O3 -I. -Wall -Minfo=accel,opt,mp
+FFLAGS = -Imod -module mod
+
+# floating point type
+FLAGS += -DFP=$(FP)
+
+# for benchmarking
+FLAGS += -DBENCHMARK_MODE
+
+# for finding the best threads
+FLAGS += -DNTHREADS=$(NTHREADS)
+
+## Libraries
+LIBS =
+
+## Additional C++ Library for Fortran90 Programs
+#LIBS += -lstdc++
+
+
+##---------------------------------------------------------------------------
+## Make rules
+TARGET = fem.gpu.$(FP)
+
+OBJS =  pfem_util.o input_cntl.o input_grid.o mat_ass_bc.o mat_ass_main.o \
+	mat_con0.o mat_con1.o output_ucd.o solve11.o solver_CG.o test1.o util.o precision.o
+
+
+all: show_config $(TARGET)
+
+.SUFFIXES:
+.SUFFIXES: .cpp .c .f90 .f .o
+
+%.o: %.c	
+	$(CC)  -c $(FLAGS) $< -o $@
+
+%.o: %.cpp
+	$(CXX) -c $(FLAGS) $< -o $@
+
+%.o: %.f90
+	mkdir -p mod
+	$(F90) -c $(FLAGS) $(FFLAGS) $< -o $@
+
+%.o: %.f
+	mkdir -p mod
+	$(F90) -c $(FLAGS) $(FFLAGS) $< -o $@
+
+$(TARGET): $(OBJS)
+#	$(CXX) $(OBJS) $(LIBS) -o $@
+#	$(CC)  $(OBJS) $(LIBS) -o $@
+	$(F90) $(OBJS) $(LIBS) -o $@
+
+install: $(TARGET)
+	mkdir -p ../bin ../log; make -C ../dat
+	cp -f  $(TARGET) ../bin
+
+clean:
+	rm -f $(TARGET) *.o */*.mod *~
+
+show_config:
+	@echo "======================================"
+	@echo "GPU FP=$(FP) NTHREADS=$(NTHREADS)     "
+	@echo "======================================"
+
+input_cntl.o: pfem_util.o
+input_grid.o: pfem_util.o
+mat_ass_bc.o: pfem_util.o
+mat_ass_main.o: pfem_util.o
+mat_con0.o: pfem_util.o
+mat_con1.o: pfem_util.o
+output_ucd.o: pfem_util.o
+solve11.o: pfem_util.o solver_CG.o precision.o
+solver_CG.o: pfem_util.o
+test1.o: solve11.o pfem_util.o
+pfem_util.o: precision.o
+util.o: precision.o

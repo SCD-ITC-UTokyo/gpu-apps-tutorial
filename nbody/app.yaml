@@ -1,0 +1,60 @@
+# nbody アプリのメタ情報 (configure.py が参照)
+name: nbody
+description: 3D direct N-body 重力多体問題 (2nd-order leapfrog 軌道積分)
+
+# バイナリ名: {target}.bench.{mode}.{FP_L}.{FP_M}  例: nbody.bench.gpu.32.32 (混合精度時は 32.64)
+target: nbody
+
+# ソース: nbody は 1 コンパイル単位 (base/nbody.cpp) で common/util の .hpp を include
+# Fortran 版は base/nbody.f90 + common/<X>_mod.f90 (4 module ファイル + main)
+sources:
+  cpp:
+    - base/nbody.cpp
+  f90:
+    - common/type_mod.f90
+    - common/cfg_mod.f90
+    - common/init_mod.f90
+    - common/io_mod.f90
+    - common/conservatives_mod.f90
+    - base/nbody.f90
+
+# include paths (configure.py が CMake/Make の -I に追加)
+include_dirs:
+  - src
+  - src/common
+  - src/util
+
+# ヘッダ群 (依存解析用)
+headers:
+  cpp:
+    - common/cfg.hpp
+    - common/conservatives.hpp
+    - common/init.hpp
+    - common/io.hpp
+    - common/type.hpp
+    - util/hdf5.hpp
+    - util/macro.hpp
+    - util/timer.hpp
+    - util/type.hpp
+
+# 外部ライブラリ (Boost と HDF5 が必須、リンク順注意)
+libs:
+  - "-lboost_program_options"
+  - "-lboost_filesystem"
+  - "-lboost_system"
+  - "-lboost_timer"
+  - "-lboost_chrono"
+  - "-lhdf5"
+
+# プリプロセッサ定義 (configure.py が -D で全て付与)
+# FP_L/FP_M はユーザ指定 (--fp が両方を上書き、または --fp-low/--fp-mid で個別)
+defines_default:
+  FP_H: 64                  # 高精度部分は常に FP64 (積分や保存量計算)
+  SIMD_BITS: 512            # AVX-512 を仮定
+  MEMORY_ALIGNMENT: 64      # 64 byte align
+  NDEBUG: ""                # release ビルド
+  CALCULATE_POTENTIAL: ""   # ポテンシャル計算を有効化
+
+# 浮動小数精度 (FP_L = i-particle, FP_M = j-particle、両方 default 32 = pure single)
+default_fp_low: 32
+default_fp_mid: 32

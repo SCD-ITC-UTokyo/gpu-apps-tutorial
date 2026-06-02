@@ -1,0 +1,64 @@
+# 東大 Miyabi
+description: "東大 Miyabi (PBS Pro、Miyabi-G=GH200/NVHPC 24.5+、Miyabi-C=Intel Xeon)"
+scheduler: pbs
+modes: [gpu, cpu, uni]
+# 実行ホスト判定 (fnmatch パターン)。configure.py が現在の hostname と照合し、
+# 別マシンの hostname なのに --machine miyabi 指定された場合はエラー終了する。
+host_patterns: ["miyabi*", "m[cg]*"]
+
+cpu:
+  default: intel
+  compilers:
+    intel:
+      cc:  { cmd: icx,  flags: [--gcc-toolchain=/opt/rh/gcc-toolset-14/root/usr] }
+      cxx: { cmd: icpx, flags: [-std=c++17, --gcc-toolchain=/opt/rh/gcc-toolset-14/root/usr] }
+      f90: { cmd: ifx,  flags: [-fpp] }
+      openmp_flag: -qopenmp
+      common_flags: [-O3, -I.]
+      fortran_module_flag: "-module mod"
+      fortran_include_flag: "-I mod"
+    gcc:
+      cc:  { cmd: gcc,      flags: [] }
+      cxx: { cmd: g++,      flags: [-std=c++17] }
+      f90: { cmd: gfortran, flags: [-cpp, -ffree-line-length-none] }
+      openmp_flag: -fopenmp
+      common_flags: [-O3, -I.]
+      fortran_module_flag: "-Jmod"
+      fortran_include_flag: "-Imod"
+
+gpu:
+  common_flags: ["-tp=native", "-O3", "-I.", "-Wall", "-Minfo=accel,opt,mp"]
+  compiler:
+    cc:  { cmd: nvc,       flags: [] }
+    cxx: { cmd: nvc++,     flags: [-std=c++17] }
+    f90: { cmd: nvfortran, flags: [-cpp] }
+  memory_models:
+    managed:  "-gpu=mem:managed"
+    separate: "-gpu=mem:separate"
+    unified:  "-gpu=mem:unified:nomanagedalloc"
+  fortran_module_flag: "-module mod"
+  fortran_include_flag: "-Imod"
+
+# ジョブスクリプト生成用 (configure.py が run.<machine>.<mode>.sh を生成)
+job:
+  scheduler: pbs
+  submit_cmd: qsub
+  status_cmd: "qstat -u $USER"
+  default_group: gr52
+  default_walltime: "00:10:00"
+  # mode → キュー & スレッド数 (Miyabi-G: GH200, Miyabi-C: Intel SPR)
+  # modules は configure.py が自動 module load することはなく、
+  # 生成ジョブスクリプトの "環境設定" コメントブロックに推奨例として出力するのみ。
+  # 実際の module load はユーザが手動で行う (ビルド env と一致させる責務)。
+  per_mode:
+    gpu: { queue: debug-g, omp_threads: 72,  modules: ["nvidia/25.9", "hdf5/1.14.6"] }
+    uni: { queue: debug-g, omp_threads: 72,  modules: ["nvidia/25.9", "hdf5/1.14.6"] }
+    cpu: { queue: debug-c, omp_threads: 112, modules: ["intel", "hdf5/1.14.6"] }
+  env:
+    - "OMP_PROC_BIND=spread"
+    - "OMP_PLACES=threads"
+
+# Kokkos (要記入: 実機の spack install 先パス)
+kokkos:
+  root: /xxx/kokkos/5.0.2/
+  cxx_standard: 17

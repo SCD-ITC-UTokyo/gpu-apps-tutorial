@@ -1,0 +1,123 @@
+## default settings.
+FP_L     ?= 32
+FP_M     ?= 32
+BENCH    ?= 1
+
+## Compiler
+
+## NVIDIA Compiler version 24.1 or former
+# CXX = not available
+# CC  = not available
+# F90 = not available
+
+## NVIDIA Compiler version 24.5 or later
+CXX = nvc++ -std=c++17 -mp=gpu -gpu=mem:unified:nomanagedalloc
+CC  = nvc              -mp=gpu -gpu=mem:unified:nomanagedalloc
+F90 = nvfortran -cpp   -mp=gpu -gpu=mem:unified:nomanagedalloc
+
+## Compile Options
+FLAGS = -tp=native -O3 -I. -Wall -Minfo=accel,opt,mp
+FFLAGS = -Imod -module mod
+
+## Additional Macros
+FLAGS += -DSIMD_BITS=512 -DMEMORY_ALIGNMENT=64 -DNDEBUG -DCALCULATE_POTENTIAL
+
+# floating point type
+FLAGS += -DFP_L=$(FP_L) -DFP_M=$(FP_M) -DFP_H=64
+
+# for benchmarking
+ifeq ($(BENCH),1)
+FLAGS += -DBENCHMARK_MODE
+endif
+
+## Libraries
+LIBS =  -lboost_system -lboost_filesystem -lboost_program_options \
+	-lboost_timer -lboost_chrono -lhdf5
+
+## Additional C++ Library for Fortran90 Programs
+LIBS += -lstdc++
+
+##---------------------------------------------------------------------------
+## Make rules
+ifeq ($(BENCH),1)
+TARGET = nbody.bench.uni.$(FP_L).$(FP_M)
+else
+TARGET = nbody.uni.$(FP_L).$(FP_M)
+endif
+
+OBJS =  common/cfg.o common/init.o common/conservatives.o common/io.o \
+	util/hdf5.o util/timer.o \
+	common/cfg_mod.o common/init_mod.o common/conservatives_mod.o common/io_mod.o common/type_mod.o \
+	util/hdf5_mod.o util/timer_mod.o \
+	base/nbody.o
+
+all: show_config $(TARGET)
+
+.SUFFIXES:
+.SUFFIXES: .cpp .c .f90 .o
+
+%.o: %.c	
+	$(CC)  -c $(FLAGS) $< -o $@
+
+%.o: %.cpp
+	$(CXX) -c $(FLAGS) $< -o $@
+
+%.o: %.f90
+	mkdir -p mod
+	$(F90) -c $(FLAGS) $(FFLAGS) $< -o $@
+
+$(TARGET): $(OBJS)
+#	$(CXX) $(OBJS) $(LIBS) -o $@
+#	$(CC)  $(OBJS) $(LIBS) -o $@
+	$(F90) $(OBJS) $(LIBS) -o $@
+
+install: $(TARGET)
+	mkdir -p ../bin ../log ../dat
+	cp -f  $(TARGET) ../bin
+
+clean:
+	rm -f $(TARGET) */*.mod */*.o */*~
+
+show_config:
+	@echo "======================================"
+	@echo "UNI FP_L=$(FP_L) FP_M=$(FP_M) BENCH=$(BENCH)"
+	@echo "======================================"
+
+base/nbody.o: \
+	common/cfg_mod.o common/conservatives_mod.o common/init_mod.o \
+	common/type_mod.o common/io_mod.o util/hdf5_mod.o util/timer_mod.o
+
+common/cfg.o: \
+	common/cfg.hpp common/type.hpp util/type.hpp \
+	common/cfg.h   common/type.h
+
+common/conservatives.o: \
+	common/conservatives.hpp common/type.hpp util/type.hpp util/hdf5.hpp util/macro.hpp \
+	common/conservatives.h   common/type.h
+
+common/init.o: \
+	common/init.hpp common/type.hpp util/type.hpp \
+	common/init.h   common/type.h
+
+common/io.o: \
+	common/io.hpp common/type.hpp common/conservatives.hpp util/type.hpp util/hdf5.hpp util/macro.hpp \
+	common/io.h   common/type.h
+
+util/hdf5.o: \
+	util/hdf5.hpp util/macro.hpp util/type.hpp \
+	util/hdf5.h
+
+util/timer.o: \
+	util/timer.hpp \
+	util/timer.h
+
+common/cfg_mod.o: \
+	common/type_mod.o
+
+common/conservatives_mod.o:
+
+common/init_mod.o: \
+	common/type_mod.o
+
+common/io_mod.o: \
+	common/type_mod.o

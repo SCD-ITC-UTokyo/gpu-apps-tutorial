@@ -1,0 +1,46 @@
+# ローカル開発機 (バッチ無し、直接実行)
+description: "ローカル開発機 (NVHPC 24.5+、auto-detect で OS/CPU/GPU を上書き表示)"
+scheduler: none
+modes: [gpu, cpu, uni]
+
+cpu:
+  default: gcc
+  compilers:
+    gcc:
+      cc:  { cmd: gcc,      flags: [] }
+      cxx: { cmd: g++,      flags: [-std=c++17] }
+      f90: { cmd: gfortran, flags: [-cpp, -ffree-line-length-none] }
+      openmp_flag: -fopenmp
+      common_flags: [-O3, -I.]
+      fortran_module_flag: "-Jmod"
+      fortran_include_flag: "-Imod"
+    nvhpc:
+      cc:  { cmd: nvc,        flags: [] }
+      cxx: { cmd: nvc++,      flags: [-std=c++17] }
+      f90: { cmd: nvfortran,  flags: [-cpp] }
+      openmp_flag: -mp
+      common_flags: [-tp=native, -O3, -I.]
+      fortran_module_flag: "-module mod"
+      fortran_include_flag: "-Imod"
+
+gpu:
+  common_flags: ["-tp=native", "-O3", "-I.", "-Wall", "-Minfo=accel,opt,mp"]
+  compiler:
+    cc:  { cmd: nvc,       flags: [] }
+    cxx: { cmd: nvc++,     flags: [-std=c++17] }
+    f90: { cmd: nvfortran, flags: [-cpp] }
+  memory_models:
+    managed:  "-gpu=mem:managed"
+    separate: "-gpu=mem:separate"
+    unified:  "-gpu=mem:unified:nomanagedalloc"
+  fortran_module_flag: "-module mod"
+  fortran_include_flag: "-Imod"
+
+# ジョブスケジューラ無し: 直接シェル実行
+job:
+  scheduler: none
+
+# kokkos: ローカル機にはデフォルトでは設定しない (任意で記入)
+# kokkos:
+#   root: /opt/kokkos/5.0.2
+#   cxx_standard: 17
