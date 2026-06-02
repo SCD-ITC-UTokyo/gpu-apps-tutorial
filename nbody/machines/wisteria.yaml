@@ -46,7 +46,7 @@ job:
   scheduler: pjm
   submit_cmd: pjsub
   status_cmd: pjstat
-  default_group: gr52
+  default_group: xxx
   default_walltime: "00:10:00"
   # mode → リソースグループ (Aquarius=GPU node、Odyssey=A64FX CPU node)
   # modules はジョブスクリプト生成時に「推奨例」コメントとして出るのみ。自動 load されない。

@@ -44,7 +44,7 @@ job:
   scheduler: pbs
   submit_cmd: qsub
   status_cmd: "qstat -u $USER"
-  default_group: gr52
+  default_group: xxx
   default_walltime: "00:10:00"
   # mode → キュー & スレッド数 (Miyabi-G: GH200, Miyabi-C: Intel SPR)
   # modules は configure.py が自動 module load することはなく、

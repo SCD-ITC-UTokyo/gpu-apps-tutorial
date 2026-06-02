@@ -61,8 +61,8 @@ def detect_primary_group() -> Optional[str]:
 
 
 def is_placeholder_group(g: str) -> bool:
-    """yaml の default_group が明らかな placeholder か判定 (gr52, xxx, none)。"""
-    return g.lower() in ("gr52", "xxx", "none", "")
+    """yaml の default_group が明らかな placeholder か判定 (xxx, xxx, none)。"""
+    return g.lower() in ("xxx", "xxx", "none", "")
 
 
 def detect_kokkos_root() -> Optional[str]:

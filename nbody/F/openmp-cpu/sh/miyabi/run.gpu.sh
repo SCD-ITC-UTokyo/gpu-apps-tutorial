@@ -12,7 +12,7 @@
 ##PJM -L node=1
 ##PJM --omp thread=48
 ##PJM -L elapse=00:10:00
-##PJM -g gr52
+##PJM -g xxx
 ##PJM -j
 
 #### use GPU(Wisteria-Aquarius) [ENABLED] ####
@@ -21,7 +21,7 @@
 #PJM -L node=1
 #PJM --omp thread=72
 #PJM -L elapse=00:10:00
-#PJM -g gr52
+#PJM -g xxx
 #PJM -j
 
 ## for Miyabi ####
@@ -31,7 +31,7 @@
 ##PBS -q debug-c
 ##PBS -l select=1:ompthreads=112
 ##PBS -l walltime=00:10:00
-##PBS -W group_list=gr52
+##PBS -W group_list=xxx
 ##PBS -j oe
 
 #### use GPU(Miyabi-G) [ENABLED] ####
@@ -39,7 +39,7 @@
 #PBS -q debug-g
 #PBS -l select=1:ompthreads=72
 #PBS -l walltime=00:10:00
-#PBS -W group_list=gr52
+#PBS -W group_list=xxx
 #PBS -j oe
 
 ################################
