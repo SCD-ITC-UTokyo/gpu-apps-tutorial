@@ -1,6 +1,6 @@
-# nbody — 3D direct N-body 重力多体問題
+# nbody — direct N-body 重力多体問題
 
-直接法 N-body 重力計算 (2nd-order leapfrog 軌道積分) を GPU プログラミングモデルの横断比較のために再構成したアプリ。同じ物理問題を 5 つの方式で実装し、性能と精度 (energy_error / virial_ratio) を比較できます。
+直接法重力多体計算 (2nd-order leapfrog 軌道積分) を GPU プログラミングモデルの横断比較のために再構成したアプリ。同じ物理問題を 5 つの方式で実装し、性能と精度 (energy_error / virial_ratio) を比較できます。
 
 | 方式 | C/C++ | Fortran | 特徴 |
 |---|:---:|:---:|---|
@@ -15,9 +15,9 @@
 
 ## このアプリで学べること
 
-- 同じ N-body 重力計算を 5 つのプログラミングモデルで書き分けたときの差分
+- 同じ重力多体計算を 5 つのプログラミングモデルで書き分けたときの差分
 - **compute-bound** な処理 (O(N^2) の粒子相互作用) で GPU のスループットがどう効くか — diffusion (memory-bound stencil)、fem (sparse SpMV) と相補的
-- **混合精度** (FP_L = i-particle、FP_M = j-particle、FP_H = 高精度部) による速度 vs 精度トレードオフ
+- **混合精度** (FP_L = 低精度部、FP_M = 標準精度部、FP_H = 高精度部) による速度 vs 精度トレードオフ
 - leapfrog 積分の保存量 (エネルギー、virial 比) で物理的妥当性を確認
 
 ### スコープ
@@ -111,8 +111,8 @@ nbody は 3 種類の浮動小数精度を使い分けます (define で制御):
 
 | マクロ | 意味 | 既定値 |
 |---|---|---|
-| `FP_L` | i-particle (low precision) | 32 |
-| `FP_M` | j-particle (mid precision) | 32 |
+| `FP_L` | 重力計算の一部分のみ (low precision) | 32 |
+| `FP_M` | 粒子データの格納，軌道計算，重力計算の一部等 (mid precision) | 32 |
 | `FP_H` | 保存量計算等 (high, 固定) | 64 |
 
 組合せ例:
@@ -154,9 +154,9 @@ nbody は 3 種類の浮動小数精度を使い分けます (define で制御):
 |---|---|---|
 | category, machine, mode, language, impl, variant, memory_model, optimization_type, optimization_param, fp, N, time_sec, performance_gflops, error, real_sec, user_sec, sys_sec, source_file | (diffusion/fem と共通の 18 列) | — |
 | **`energy_error_final`** | 最終エネルギー誤差 (相対) | float |
-| **`virial_ratio_final`** | virial 比 (理想は -0.5) | float |
+| **`virial_ratio_final`** | virial 比 (理想は 0.5) | float |
 | **`dt`** | 時間刻み | float |
-| **`energy_error_worst`** | シミュ中の最悪エネルギー誤差 | float |
+| **`energy_error_worst`** | シミュレーション中の最悪エネルギー誤差 | float |
 | **`interactions_per_sec`** | 粒子間相互作用処理数/秒 (nbody 性能の主要メトリクス) | int |
 | **`step`** | 時間ステップ数 | int |
 | **`time_per_step_sec`** | 1 step あたりの平均時間 | 秒 |
