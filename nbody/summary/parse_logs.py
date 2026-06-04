@@ -30,7 +30,9 @@ import sys
 from pathlib import Path
 from typing import Iterable
 
-# nbody.csv の 21 カラムスキーマ
+# 出力スキーマ。fp は精度構成を表すラベル (低精度部 FP_L / 標準精度部 FP_M を明示)。
+# 例: "32 (FP_L=FP_M=32)" / "32_64 (FP_L=32, FP_M=64)" / "64 (FP_L=FP_M=64)"。
+# 高精度部 FP_H は常に 64 固定のため独立カラムにはしない。
 COLS = [
     "category", "machine", "mode", "language",
     "impl", "variant", "memory_model",
@@ -47,8 +49,13 @@ PATH_RE = re.compile(
     r"/(?P<lang>C\+\+|F)/(?P<impl>[^/]+)(?:/(?P<variant>[^/]+(?:/[^/]+)?))?/build-(?P<machine>[^-]+)-(?P<mode>[^/]+)/(?P<binname>[^/]+)$"
 )
 # Kokkos は 4 階層 (kokkos/<policy>/<sub>) なので variant が "policy/sub" 形式
+# nbody のバイナリ名は混合精度を反映し target[.bench].mode.FP_L[.FP_M][.NTHREADS]:
+#   nbody.gpu.32.64  → FP_L=32 (低精度部), FP_M=64 (標準精度部)
+#   nbody.gpu.32     → FP_L=FP_M=32 (FP_M 省略 = pure)
+# 末尾 2 数値は (FP_L, FP_M)。FP_M を nthreads と誤認しないよう専用キャプチャにする。
 BIN_RE = re.compile(
-    r"^(?P<target>\w+)\.(?P<mode>gpu|cpu|uni)\.(?P<fp>\d+)(?:\.(?P<nthr>\d+))?$"
+    r"^(?P<target>\w+)(?:\.bench)?\.(?P<mode>gpu|cpu|uni)"
+    r"\.(?P<fp_l>\d+)(?:\.(?P<fp_m>\d+))?(?:\.(?P<nthr>\d+))?$"
 )
 
 
@@ -87,11 +94,17 @@ def infer_meta(binary_path: str, log_file: Path) -> dict:
         if machine_from_log:
             meta["machine"] = machine_from_log
 
-    # バイナリ名から target/mode/fp/nthreads を取得
+    # バイナリ名から target/mode/FP_L/FP_M/nthreads を取得
     mb = BIN_RE.match(os.path.basename(binname))
     if mb:
         meta["mode"] = meta["mode"] or mb.group("mode")
-        meta["fp"] = mb.group("fp")
+        fp_l = mb.group("fp_l")
+        fp_m = mb.group("fp_m") or fp_l       # FP_M 省略時は FP_L と同じ (pure precision)
+        # fp = 精度構成ラベル。低精度部 FP_L / 標準精度部 FP_M を明示 (高精度部 FP_H は常に 64)
+        if fp_l == fp_m:
+            meta["fp"] = f"{fp_l} (FP_L=FP_M={fp_l})"
+        else:
+            meta["fp"] = f"{fp_l}_{fp_m} (FP_L={fp_l}, FP_M={fp_m})"
         if mb.group("nthr"):
             meta["optimization_param"] = f"NTHREADS={mb.group('nthr')}"
             meta["optimization_type"] = "nthreads"

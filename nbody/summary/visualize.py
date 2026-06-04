@@ -33,8 +33,9 @@ df = pd.read_csv(CSV_PATH, encoding="utf-8-sig")
 print(f"  行数: {len(df)},  列数: {len(df.columns)}")
 
 # 数値化 (空文字や NaN は欠損として扱う)
+# 注: fp は "32_64" のような混合精度表記を含むため数値化しない (カテゴリとして扱う)
 NUMERIC_COLS = [
-    "fp", "N",
+    "N",
     "time_sec", "performance_gflops", "error",
     "real_sec", "user_sec", "sys_sec",
     # nbody 固有
@@ -50,6 +51,11 @@ for c in NUMERIC_COLS:
 df["variant_display"] = df["variant"].fillna("").replace("", "(no variant)")
 df["param_display"] = df["optimization_param"].fillna("").replace("", "(baseline)")
 
+# optimization_param の重複表記を統合 ("-O2" と "O2" 等 → "O2"。baseline の "-" は維持)
+if "optimization_param" in df.columns:
+    df["optimization_param"] = df["optimization_param"].apply(
+        lambda v: v if (pd.isna(v) or str(v) == "-") else str(v).lstrip("-"))
+
 print(f"  category    : {sorted(df['category'].dropna().unique())}")
 print(f"  machine     : {sorted(df['machine'].dropna().unique())}")
 print(f"  impl        : {sorted(df['impl'].dropna().unique())}")
@@ -60,6 +66,11 @@ print(f"  opt_type    : {sorted(df['optimization_type'].dropna().unique())}")
 # 2. 軸/フィルタ/色分けの選択肢
 # ============================================================
 AXIS_CHOICES = [c for c in NUMERIC_COLS if c in df.columns and df[c].notna().any()]
+# 精度 (fp / 精度構成 / FP_L / FP_M / FP_H) もカテゴリ軸として選べるようにする。
+# これで「X=精度構成, Y=performance_gflops, 棒/箱ひげ」のように精度別の性能比較を直接表示できる。
+PRECISION_AXES = [c for c in ["fp"]
+                  if c in df.columns and df[c].astype(str).str.strip().ne("").any()]
+AXIS_CHOICES = AXIS_CHOICES + [c for c in PRECISION_AXES if c not in AXIS_CHOICES]
 
 FILTER_CATS = [
     c for c in [
@@ -71,9 +82,22 @@ FILTER_CATS = [
 ]
 
 COLOR_CATS = [
-    "impl", "variant_display", "memory_model", "optimization_type",
-    "category", "machine", "mode", "language", "fp", "param_display",
+    c for c in [
+        "impl", "variant_display", "memory_model", "optimization_type",
+        "category", "machine", "mode", "language", "fp", "param_display",
+    ]
+    if c in df.columns
 ]
+
+# サイドバー表示用の日本語ラベル (列名 → 表示名)。
+# fp は精度構成 (低精度部 FP_L / 標準精度部 FP_M)。値自体が "32 (FP_L=FP_M=32)" 等のラベル。
+LABELS = {
+    "fp": "fp (精度構成)",
+}
+
+
+def disp(c):
+    return LABELS.get(c, c)
 
 PALETTE = [
     "#636EFA", "#EF553B", "#00CC96", "#AB63FA", "#FFA15A",
@@ -98,15 +122,15 @@ def build_dashboard_html():
         return "selected" if c == default else ""
 
     axis_x_options_html = "\n".join(
-        f'<option value="{c}" {default_sel(c, "N")}>{c}</option>'
+        f'<option value="{c}" {default_sel(c, "N")}>{disp(c)}</option>'
         for c in AXIS_CHOICES
     )
     axis_y_options_html = "\n".join(
-        f'<option value="{c}" {default_sel(c, "performance_gflops")}>{c}</option>'
+        f'<option value="{c}" {default_sel(c, "performance_gflops")}>{disp(c)}</option>'
         for c in AXIS_CHOICES
     )
     color_options_html = "\n".join(
-        f'<option value="{c}" {default_sel(c, "impl")}>{c}</option>'
+        f'<option value="{c}" {default_sel(c, "impl")}>{disp(c)}</option>'
         for c in COLOR_CATS
     )
     chart_options_html = """
@@ -155,7 +179,7 @@ def build_dashboard_html():
             )
         filter_blocks.append(
             f'<div class="filter-group">'
-            f'<div class="filter-title">{cat} '
+            f'<div class="filter-title">{disp(cat)} '
             f'<button class="toggle-btn" onclick="toggleAll(this, \'{cat}\')">'
             f'全解除</button></div>'
             f'<div class="filter-checks">{checks}</div></div>'
@@ -356,7 +380,8 @@ function hoverText(r) {{
     return `<b>${{r['impl']}}</b>`
         + (r['variant_display'] && r['variant_display'] !== '(no variant)' ? ` / ${{r['variant_display']}}` : '')
         + (r['param_display'] && r['param_display'] !== '(baseline)' ? ` [${{r['param_display']}}]` : '')
-        + `<br>machine=${{r['machine']}}/${{r['mode']}}  lang=${{r['language']}}  fp=${{r['fp']}}<br>`
+        + `<br>machine=${{r['machine']}}/${{r['mode']}}  lang=${{r['language']}}<br>`
+        + `精度構成 (fp): ${{r['fp']}}<br>`
         + `memory=${{r['memory_model']}}  opt=${{r['optimization_type']}}<br>`
         + `N=${{r['N']}} (${{r['nx']}}×${{r['ny']}}×${{r['nz']}})<br>`
         + `time=${{fmt(r['time_sec'])}}s  perf=${{fmt(r['performance_gflops'])}} GFlop/s<br>`
