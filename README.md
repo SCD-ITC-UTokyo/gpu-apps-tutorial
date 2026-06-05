@@ -35,7 +35,7 @@ Dirichlet 境界条件、精度は FP32 / FP64 切替可。
 
 | アプリ | 解説 (README) | 使い方 / ビルド手順 (HTML) | 性能評価ダッシュボード (HTML) |
 |---|---|---|---|
-| **diffusion** | [README](diffusion/README.md) | [build-tutorial.html](diffusion/docs/build-tutorial.html) | [diffusion_dashboard.html](diffusion/summary/diffusion_dashboard.html) |
-| **fem** | [README](fem/README.md) | [build-tutorial.html](fem/docs/build-tutorial.html) | [fem_dashboard.html](fem/summary/fem_dashboard.html) |
-| **nbody** | [README](nbody/README.md) | [build-tutorial.html](nbody/docs/build-tutorial.html) | [nbody_dashboard.html](nbody/summary/nbody_dashboard.html) |
+| **diffusion** | [README](diffusion/README.md) | [build-tutorial.html](https://raw.githack.com/SCD-ITC-UTokyo/gpu-apps-tutorial/main/diffusion/docs/build-tutorial.html) | [diffusion_dashboard.html](https://raw.githack.com/SCD-ITC-UTokyo/gpu-apps-tutorial/main/diffusion/summary/diffusion_dashboard.html) |
+| **fem** | [README](fem/README.md) | [build-tutorial.html](https://raw.githack.com/SCD-ITC-UTokyo/gpu-apps-tutorial/main/fem/docs/build-tutorial.html) | [fem_dashboard.html](https://raw.githack.com/SCD-ITC-UTokyo/gpu-apps-tutorial/main/fem/summary/fem_dashboard.html) |
+| **nbody** | [README](nbody/README.md) | [build-tutorial.html](https://raw.githack.com/SCD-ITC-UTokyo/gpu-apps-tutorial/main/nbody/docs/build-tutorial.html) | [nbody_dashboard.html](https://raw.githack.com/SCD-ITC-UTokyo/gpu-apps-tutorial/main/nbody/summary/nbody_dashboard.html) |
 
