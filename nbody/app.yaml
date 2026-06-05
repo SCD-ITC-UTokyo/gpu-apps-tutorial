@@ -55,6 +55,6 @@ defines_default:
   NDEBUG: ""                # release ビルド
   CALCULATE_POTENTIAL: ""   # ポテンシャル計算を有効化
 
-# 浮動小数精度 (FP_L = i-particle, FP_M = j-particle、両方 default 32 = pure single)
+# 浮動小数精度 (FP_L = 低精度部, FP_M = 標準精度部、両方 default 32 = pure single)
 default_fp_low: 32
 default_fp_mid: 32
