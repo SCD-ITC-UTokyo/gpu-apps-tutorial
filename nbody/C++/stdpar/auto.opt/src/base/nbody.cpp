@@ -15,9 +15,6 @@
 
 #include <unistd.h>
 
-#include <boost/filesystem.hpp>                // boost::filesystem
-#include <boost/math/constants/constants.hpp>  // boost::math::constants::two_pi
-#include <boost/program_options.hpp>           // boost::program_options
 #include <cmath>                               // std::fma
 #include <cstdint>                             // int32_t
 #include <iostream>                            // std::cout
@@ -29,7 +26,7 @@
 #include "common/init.hpp"
 #include "common/io.hpp"
 #include "common/type.hpp"
-#include "util/hdf5.hpp"
+#include "util/counting_iterator.hpp"
 #include "util/macro.hpp"
 #include "util/timer.hpp"
 
@@ -37,7 +34,6 @@
 #include <iterator>  // std::begin, std::end
 #include <algorithm> // std::for_each
 #include <execution> // std::execution::par
-#include <boost/iterator/counting_iterator.hpp> // boost::iterators::counting_iterator
 
 constexpr type::flt_acc newton = AS_FLT_ACC(1.0);  // gravitational constant
 
@@ -55,7 +51,7 @@ constexpr type::flt_acc newton = AS_FLT_ACC(1.0);  // gravitational constant
 static inline void calc_acc(const type::int_idx Ni, const type::position *const ipos, type::acceleration *__restrict iacc, const type::int_idx Nj, const type::position *const jpos, const type::flt_pos eps2) {
 
   std::for_each_n
-  ( std::execution::par, boost::iterators::counting_iterator<int32_t>(0), Ni, [&](int i)
+  ( std::execution::par, util::counting_iterator<int32_t>(0), Ni, [&](int i)
   {
     // initialization
     const auto pi = ipos[i];
@@ -105,7 +101,7 @@ static inline void trim_acc(const type::int_idx Ni, type::acceleration *__restri
 #endif  // CALCULATE_POTENTIAL
 ) {
   std::for_each_n
-  ( std::execution::par, boost::iterators::counting_iterator<int32_t>(0), Ni, [&](int i)
+  ( std::execution::par, util::counting_iterator<int32_t>(0), Ni, [&](int i)
   {
     // initialization
     auto ai = acc[i];
@@ -132,7 +128,7 @@ static inline void trim_acc(const type::int_idx Ni, type::acceleration *__restri
 ///
 static inline void kick(const type::int_idx num, type::velocity *__restrict vel, const type::acceleration *const acc, const type::flt_vel dt) {
   std::for_each_n
-  ( std::execution::par, boost::iterators::counting_iterator<int32_t>(0), num, [&](int i)
+  ( std::execution::par, util::counting_iterator<int32_t>(0), num, [&](int i)
   {
     // initialization
     auto vi = vel[i];
@@ -156,7 +152,7 @@ static inline void kick(const type::int_idx num, type::velocity *__restrict vel,
 ///
 static inline void drift(const type::int_idx num, type::position *__restrict pos, const type::velocity *const vel, const type::flt_pos dt) {
   std::for_each_n
-  ( std::execution::par, boost::iterators::counting_iterator<int32_t>(0), num, [&](int i)
+  ( std::execution::par, util::counting_iterator<int32_t>(0), num, [&](int i)
   {
     // initialization
     auto pi = pos[i];
@@ -182,7 +178,7 @@ static inline void drift(const type::int_idx num, type::position *__restrict pos
 static inline void kick_backward_half(const type::int_idx num, const type::velocity *const vel_src, const type::acceleration *const acc, type::velocity *__restrict vel, const type::flt_vel dt) {
   const auto dt_2 = AS_FLT_VEL(0.5) * dt;
   std::for_each_n
-  ( std::execution::par, boost::iterators::counting_iterator<int32_t>(0), num, [&](int i)
+  ( std::execution::par, util::counting_iterator<int32_t>(0), num, [&](int i)
   {
     // initialization
     auto vi = vel_src[i];
@@ -276,8 +272,6 @@ auto main([[maybe_unused]] const int32_t argc, [[maybe_unused]] const char *cons
 #ifdef CALCULATE_POTENTIAL
   const auto eps_inv = AS_FLT_ACC(1.0) / CAST2ACC(eps);
 #endif  // CALCULATE_POTENTIAL
-  util::hdf5::commit_datatype_vec3();
-  util::hdf5::commit_datatype_vec4();
 #endif  // BENCHMARK_MODE
 
 #ifdef BENCHMARK_MODE
@@ -297,7 +291,7 @@ auto main([[maybe_unused]] const int32_t argc, [[maybe_unused]] const char *cons
     init::set_uniform_sphere(num, pos, vel, M_tot, rad, virial, CAST2VEL(newton));
 
 #ifndef BENCHMARK_MODE
-    // write the first snapshot
+    // record the conservation errors at the initial snapshot time
     calc_acc(num, pos, acc, num, pos, eps2);
     trim_acc(num, acc
 #ifdef CALCULATE_POTENTIAL
@@ -306,7 +300,7 @@ auto main([[maybe_unused]] const int32_t argc, [[maybe_unused]] const char *cons
 #endif  // CALCULATE_POTENTIAL
     );
     auto error = conservatives();
-    io::write_snapshot(num, pos, vel, acc, file.c_str(), present, time, error);
+    error.record(num, pos, vel, acc);
 
     // half-step integration for velocity
     kick(num, vel, acc, AS_FP_M(0.5) * dt);
@@ -330,13 +324,13 @@ auto main([[maybe_unused]] const int32_t argc, [[maybe_unused]] const char *cons
       );
       kick(num, vel, acc, dt);
 
-      // write snapshot
+      // record the conservation errors at every snapshot time
       if (present > previous) {
         previous = present;
         time_from_snapshot = AS_FP_M(0.0);
         time += snapshot_interval;
         kick_backward_half(num, vel, acc, vel_tmp, dt);
-        io::write_snapshot(num, pos, vel_tmp, acc, file.c_str(), present, time, error);
+        error.record(num, pos, vel_tmp, acc);
       }
     }
 #else   // BENCHMARK_MODE
@@ -375,8 +369,6 @@ auto main([[maybe_unused]] const int32_t argc, [[maybe_unused]] const char *cons
 #ifdef BENCHMARK_MODE
   }
 #else  // BENCHMARK_MODE
-  util::hdf5::remove_datatype_vec3();
-  util::hdf5::remove_datatype_vec4();
 
   time_to_solution.stop();
   io::write_log(argv[0], time_to_solution.get_elapsed_wall(), step, num, file.c_str()

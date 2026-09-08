@@ -55,7 +55,7 @@ kokkos/
 Kokkos は **CMake 必須** (Make 非対応)。
 
 ```bash
-cd apps/fem
+cd fem
 ./configure.py --variant C++/kokkos/range/baseline --machine local --mode gpu
 cd C++/kokkos/range/baseline
 cmake -B build-local-gpu -S . && cmake --build build-local-gpu

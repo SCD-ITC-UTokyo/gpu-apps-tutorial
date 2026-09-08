@@ -60,8 +60,8 @@ c$$$      allocate (WW(N,4))
       MAXIT  = ITER
       TOL    = RESID           
 
-!$acc parallel loop
-!$acc& private(i)
+!$omp parallel do
+!$omp& private(i)
       do i= 1, NP
         X(i)= 0.d0
 c$$$  W(i,:)= 0.d0
@@ -79,8 +79,8 @@ c$$$  W(i,:)= 0.d0
 !C +-----------------------+
 !C===
 
-!$acc parallel loop
-!$acc& private(i,j,WVAL)
+!$omp parallel do
+!$omp& private(i,j,WVAL)
       do i= 1, NP
 c$$$    WW(i,DD)= 1.d0/D(i)
         DW(i)= 1.d0/D(i)
@@ -93,8 +93,8 @@ c$$$    WW(i,R)= WVAL
       enddo
 
       BNRM2= 0.d0
-!$acc parallel loop
-!$acc& private(i) reduction(+:BNRM2)
+!$omp parallel do
+!$omp& private(i) reduction(+:BNRM2)
       do i= 1, NP
         BNRM2= BNRM2 + B(i)**2
       enddo
@@ -111,8 +111,8 @@ c$$$    WW(i,R)= WVAL
 !C +----------------+
 !C===
 
-!$acc parallel loop
-!$acc& private(i)
+!$omp parallel do
+!$omp& private(i)
       do i= 1, NP
 c$$$    WW(i,Z)= WW(i,R) * WW(i,DD)
         ZW(i)= RW(i) * DW(i)
@@ -125,8 +125,8 @@ c$$$    WW(i,Z)= WW(i,R) * WW(i,DD)
 !C +---------------+
 !C===
       RHO= 0.d0
-!$acc parallel loop
-!$acc& private(i) reduction(+:RHO)
+!$omp parallel do
+!$omp& private(i) reduction(+:RHO)
       do i= 1, NP
 c$$$    RHO= RHO + WW(i,R)*WW(i,Z)
         RHO= RHO + RW(i)*ZW(i)
@@ -139,16 +139,16 @@ c$$$    RHO= RHO + WW(i,R)*WW(i,Z)
 !C +-----------------------------+
 !C===
       if ( ITER.eq.1 ) then
-!$acc parallel loop
-!$acc& private(i)
+!$omp parallel do
+!$omp& private(i)
         do i= 1, NP
 c$$$      WW(i,P)= WW(i,Z)
           PW(i)= ZW(i)
         enddo
       else
         BETA= RHO / RHO1
-!$acc parallel loop
-!$acc& private(i)
+!$omp parallel do
+!$omp& private(i)
          do i= 1, NP
 c$$$       WW(i,P)= WW(i,Z) + BETA*WW(i,P)
            PW(i)= ZW(i) + BETA*PW(i)
@@ -162,8 +162,8 @@ c$$$       WW(i,P)= WW(i,Z) + BETA*WW(i,P)
 !C +-------------+
 !C===   
 
-!$acc parallel loop
-!$acc& private(i,j,WVAL)
+!$omp parallel do
+!$omp& private(i,j,WVAL)
       do i= 1, NP
 c$$$    WVAL= D(i)*WW(i,P)
         WVAL= D(i)*PW(i)
@@ -182,8 +182,8 @@ c$$$    WW(i,Q)= WVAL
 !C +---------------------+
 !C===
       C1= 0.d0
-!$acc parallel loop
-!$acc& private(i) reduction(+:C1)
+!$omp parallel do
+!$omp& private(i) reduction(+:C1)
       do i= 1, NP
 c$$$    C1= C1 + WW(i,P)*WW(i,Q)
         C1= C1 + PW(i)*QW(i)
@@ -198,8 +198,8 @@ c$$$    C1= C1 + WW(i,P)*WW(i,Q)
 !C +----------------------+
 !C===
 
-!$acc parallel loop
-!$acc& private(i)
+!$omp parallel do
+!$omp& private(i)
       do i= 1, NP
 c$$$     X(i)  = X (i)   + ALPHA * WW(i,P)
          X(i)  = X (i)   + ALPHA * PW(i)
@@ -208,8 +208,8 @@ c$$$    WW(i,R)= WW(i,R) - ALPHA * WW(i,Q)
       enddo
 
       DNRM2= 0.d0
-!$acc parallel loop
-!$acc& private(i) reduction(+:DNRM2)
+!$omp parallel do
+!$omp& private(i) reduction(+:DNRM2)
       do i= 1, NP
 c$$$        DNRM2= DNRM2 + WW(i,R)**2
         DNRM2= DNRM2 + RW(i)**2

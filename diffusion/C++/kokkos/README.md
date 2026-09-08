@@ -59,7 +59,7 @@ Kokkos のインストール時に backend (CUDA/OpenMP/HIP/Serial) と GPU arch
 Kokkos は **CMake 必須**。Make は非対応。
 
 ```bash
-cd apps/diffusion
+cd diffusion
 ./configure.py --variant C++/kokkos/range/baseline --machine local --mode gpu
 
 cd C++/kokkos/range/baseline

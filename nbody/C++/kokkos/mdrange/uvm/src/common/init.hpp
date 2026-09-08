@@ -10,6 +10,7 @@
 #ifndef COMMON_INIT_HPP
 #define COMMON_INIT_HPP
 
+#include <cmath>   // M_PI
 #include <random>       // std::random_device
 #include <type_traits>  // std::remove_reference_t
 
@@ -46,7 +47,7 @@ static inline void set_uniform_sphere(const type::int_idx num, type::position *p
     const auto rr = rad * std::cbrt(dist_uni(engine));
     const auto prj = AS_FLT_POS(2.0) * dist_uni(engine) - AS_FLT_POS(1.0);
     const auto RR = rr * std::sqrt(AS_FLT_POS(1.0) - prj * prj);
-    const auto theta = boost::math::constants::two_pi<decltype((*pos).x)>() * dist_uni(engine);
+    const auto theta = static_cast<decltype((*pos).x)>(2.0 * M_PI) * dist_uni(engine);
     auto pi = type::position{};
     pi.x = RR * std::cos(theta);
     pi.y = RR * std::sin(theta);

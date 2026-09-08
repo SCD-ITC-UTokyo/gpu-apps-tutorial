@@ -56,7 +56,6 @@ if "optimization_param" in df.columns:
     df["optimization_param"] = df["optimization_param"].apply(
         lambda v: v if (pd.isna(v) or str(v) == "-") else str(v).lstrip("-"))
 
-print(f"  category    : {sorted(df['category'].dropna().unique())}")
 print(f"  machine     : {sorted(df['machine'].dropna().unique())}")
 print(f"  impl        : {sorted(df['impl'].dropna().unique())}")
 print(f"  opt_type    : {sorted(df['optimization_type'].dropna().unique())}")
@@ -72,11 +71,16 @@ PRECISION_AXES = [c for c in ["fp"]
                   if c in df.columns and df[c].astype(str).str.strip().ne("").any()]
 AXIS_CHOICES = AXIS_CHOICES + [c for c in PRECISION_AXES if c not in AXIS_CHOICES]
 
+# フィルタ軸から外した列 (いずれも他の軸から一意に決まり絞り込みの幅を増やさない):
+#   category          … impl と重複 (Kokkos / non-Kokkos は impl で判る)
+#   optimization_type … (impl, variant) から一意に決まる
+# CSV の列自体は互換性のため残し、色分け軸 (COLOR_CATS) にも残す
+# (baseline / tile-sweep 等でまとめて色を付けられると便利なため)。
 FILTER_CATS = [
     c for c in [
-        "category", "machine", "mode", "language",
+        "machine", "mode", "language",
         "impl", "variant_display", "memory_model",
-        "optimization_type", "param_display", "fp",
+        "param_display", "fp",
     ]
     if c in df.columns
 ]
@@ -84,7 +88,7 @@ FILTER_CATS = [
 COLOR_CATS = [
     c for c in [
         "impl", "variant_display", "memory_model", "optimization_type",
-        "category", "machine", "mode", "language", "fp", "param_display",
+        "machine", "mode", "language", "fp", "param_display",
     ]
     if c in df.columns
 ]
@@ -383,7 +387,7 @@ function hoverText(r) {{
         + `<br>machine=${{r['machine']}}/${{r['mode']}}  lang=${{r['language']}}<br>`
         + `精度構成 (fp): ${{r['fp']}}<br>`
         + `memory=${{r['memory_model']}}  opt=${{r['optimization_type']}}<br>`
-        + `N=${{r['N']}} (${{r['nx']}}×${{r['ny']}}×${{r['nz']}})<br>`
+        + `N=${{r['N']}} 粒子<br>`
         + `time=${{fmt(r['time_sec'])}}s  perf=${{fmt(r['performance_gflops'])}} GFlop/s<br>`
         + `err=${{fmt(r['error'])}}`;
 }}

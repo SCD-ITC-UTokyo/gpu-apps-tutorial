@@ -27,6 +27,15 @@ void MAT_ASS_BC()
   
   IWKX=(KINT*)malloc(sizeof(KINT)*NP*2);
   for(i=0;i<NP;i++) for(j=0;j<2;j++) IWKX[i*2+j]=0;
+
+  /** stdpar GPU offload: local bindings of the namespace-scope objects **/
+  KINT  *const NODGRP_ITEM= ::NODGRP_ITEM;
+  KINT  *const indexLU    = ::indexLU;
+  KINT  *const itemLU     = ::itemLU;
+  KREAL *const AMAT       = ::AMAT;
+  KREAL *const B          = ::B;
+  KREAL *const D          = ::D;
+
   
 /**
    Z=Zmax
@@ -34,7 +43,7 @@ void MAT_ASS_BC()
   std::for_each_n
   ( std::execution::par,
     boost::iterators::counting_iterator<int32_t>(0), NP,
-    [&](int in) {
+    [=](int in) {
     IWKX[in*2+0]=0;
   });
   
@@ -46,7 +55,7 @@ void MAT_ASS_BC()
   ( std::execution::par,
     boost::iterators::counting_iterator<int32_t>(NODGRP_INDEX[ib0]),
     NODGRP_INDEX[ib0+1]-NODGRP_INDEX[ib0],
-    [&](int ib) {
+    [=](int ib) {
     int in=NODGRP_ITEM[ib];
     IWKX[(in-1)*2+0]=1;
   });
@@ -54,7 +63,7 @@ void MAT_ASS_BC()
   std::for_each_n
   ( std::execution::par,
     boost::iterators::counting_iterator<int32_t>(0), NP,
-    [&](int in) {
+    [=](int in) {
     if( IWKX[in*2+0] == 1 ){
       B[in]= 0.e0;
       D[in]= 1.e0;
@@ -67,7 +76,7 @@ void MAT_ASS_BC()
   std::for_each_n
   ( std::execution::par,
     boost::iterators::counting_iterator<int32_t>(0), NP,
-    [&](int in) {
+    [=](int in) {
     for(int k=indexLU[in];k<indexLU[in+1];k++){
       if (IWKX[itemLU[k]*2+0] == 1 ) {
 	AMAT[k]= 0.e0;

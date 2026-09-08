@@ -38,7 +38,7 @@ OpenMP CPU の `#pragma omp parallel for collapse(3)` と OpenMP target の
 
 > **📘 ビジュアル版チュートリアル**: より分かりやすい HTML 版を `docs/build-tutorial.html` に用意しました。
 > ブラウザで開くと、ステップごとのカード、コード比較、フロー図、トラブルシューティングなどを
-> 視覚的に確認できます。`open apps/diffusion/docs/build-tutorial.html` または GitHub Pages で公開可能。
+> 視覚的に確認できます。`open diffusion/docs/build-tutorial.html` または GitHub Pages で公開可能。
 
 
 ### 必要なもの
@@ -59,7 +59,7 @@ NVHPC が `/opt/nvidia/hpc_sdk/` 等にインストール済みであること�
 
 ```bash
 # 1. リポジトリのルートに移動
-cd apps/diffusion
+cd diffusion
 
 # 2. 構成を生成 (CMake ファイルを作る)
 ./configure.py --variant C++/openmp-target/auto.def --machine local --mode gpu
@@ -71,8 +71,10 @@ cmake --build build-local-gpu
 
 # 4. 実行 (引数はグリッドサイズ N)
 ./build-local-gpu/diffusion.gpu.32 64
-# 出力例: ./build-local-gpu/diffusion.gpu.32,  64, 6.685e-02, 4.175e+11, 1.214e-05
-#         [バイナリ名]                          [N] [計算時間 s] [FLOPS]   [誤差]
+# 出力例 (BENCHMARK_MODE の 10 列 CSV。1 行目は '#' で始まる列名行):
+# binary,N(=nx*ny*nz),time_sec,performance_gflops,error,real_sec,user_sec,sys_sec,num_time_steps_logged,last_sim_time
+# ./build-local-gpu/diffusion.gpu.32,262144, 6.685e-02, 4.176e+02, 1.214e-05, 2.118e-01, 7.210e-02, 1.018e-01, 8192, 2.000e+00
+#   N は総格子点数 (引数 64 なら 64^3 = 262144)、performance_gflops は GFlop/s
 ```
 
 うまく動かない場合: [トラブルシューティング](#トラブルシューティング) を参照。
@@ -83,7 +85,7 @@ cmake --build build-local-gpu
 
 1. **CPU 版と比較**: 同じ問題を CPU で動かして GPU の効果を体感
    ```bash
-   cd apps/diffusion
+   cd diffusion
    ./configure.py --variant C++/openmp-cpu --machine local --mode cpu
    cd C++/openmp-cpu && cmake -B build-local-cpu && cmake --build build-local-cpu
    ./build-local-cpu/diffusion.cpu.32 64
@@ -118,7 +120,7 @@ cmake --build build-local-gpu
 | 症状 | 原因と対処 |
 |---|---|
 | `ERROR: PyYAML が必要です` | `pip install pyyaml` |
-| `nvc++: command not found` | NVHPC のパスが通っていない。`source /opt/nvidia/hpc_sdk/Linux_x86_64/<ver>/comm_libs/<ver>/nvshmem/etc/nvshmem-config-h.cmake` 等を環境に追加 |
+| `nvc++: command not found` | NVHPC のパスが通っていない。`export PATH=/opt/nvidia/hpc_sdk/Linux_x86_64/<ver>/compilers/bin:$PATH` (と `LD_LIBRARY_PATH` に `.../compilers/lib`) を追加するか、module 環境なら `module load nvidia` (Miyabi/Wisteria) / `module load nvhpc` |
 | `cmake: command not found` | CMake 未インストール。`apt install cmake` 等 |
 | 数値結果がおかしい (NaN 等) | `-DFP=64` で double 精度に切り替えて確認 |
 | GPU が認識されない | `nvidia-smi` で GPU 認識を確認、`nvc++ -mp=gpu -gpu=cc80 ...` 等 GPU の compute capability を明示 |
@@ -128,11 +130,13 @@ cmake --build build-local-gpu
 ## ディレクトリ構成
 
 ```
-apps/diffusion/
+diffusion/
 ├── README.md                           # ← このファイル
 ├── app.yaml                            # アプリのメタ情報 (ソース、TARGET 名)
 ├── implementations.yaml                # impl × variant の軸定義
 ├── configure.py                        # ビルド構成生成器 (yaml → CMakeLists/Makefile)
+├── docs/
+│   └── build-tutorial.html             # ビジュアル版チュートリアル
 ├── machines/                           # マシン固有設定 (compiler/flags + job ブロック)
 │   ├── miyabi.yaml                     # 東大 Miyabi (Intel CPU + NVHPC 24.5+/GH200, PBS Pro)
 │   ├── wisteria.yaml                   # 東大 Wisteria (GCC/FCCpx + NVHPC 24.1/A100, PJM)
@@ -155,12 +159,10 @@ apps/diffusion/
 ├── results/                            # 読者の実行結果出力先 (空)
 │   └── {miyabi,wisteria,local}/
 └── summary/                            # 既測の公開データ + 可視化
-    ├── diffusion.csv                   # 統合 CSV (Kokkos + 非 Kokkos、907 行)
+    ├── diffusion.csv                   # 統合 CSV (Kokkos + 非 Kokkos、21 列)
     ├── diffusion_dashboard.html        # インタラクティブ可視化
-    ├── visualize.py                    # ダッシュボード生成器
-    ├── results/{miyabi,wisteria}/      # 既測ログ
-    ├── orig-scripts/                   # 元プロジェクトのジョブスクリプト類
-    └── docs/                           # PDF マニュアル
+    ├── parse_logs.py                   # 実行ログ → diffusion.csv 形式に変換
+    └── visualize.py                    # ダッシュボード生成器
 ```
 
 各 impl ディレクトリには独自の README があります (例: `C++/openmp-target/README.md`)。
@@ -205,7 +207,7 @@ impl 固有の説明・コード見どころ・variant 詳細はそちらを参�
 ### Step 1: 構成生成
 
 ```bash
-cd apps/diffusion
+cd diffusion
 ./configure.py --variant C++/stdpar/auto.def --machine miyabi --mode uni
 ```
 
@@ -288,14 +290,16 @@ nvc++ ... misc.o diffusion.o main.o  -o diffusion.uni.32
 
 `configure.py` は variant ディレクトリに `run.<machine>.<mode>.sh` を**自動生成**します
 (machine yaml の `job:` ブロックから PBS / PJM / local 用の雛形を組み立て)。
-このスクリプトを編集 (課金グループ等) してジョブを投入します。
+課金グループ (`group_list`) は `id -gn` の primary group が埋まり、実行行 (`N=64` とバイナリ呼び出し) も
+生成済みなので、そのままで良ければ編集せずに投入できます (違う場合は `--group` で指定)。
+module のロードだけはコメントブロックとして推奨例が入っているので、必要に応じてコメントを外してください。
 
 ```bash
 # Miyabi (PBS Pro) — uni mode の例
-# 課金グループ (group_list) を自分のものに書き換える
 qsub run.miyabi.uni.sh
 qstat -u $USER                                   # 状態確認
-# 完了後、run.miyabi.uni.sh.o<jobid> に標準出力 (10 カラム CSV) が出力される
+# 完了後、diffusion.o<jobid> に標準出力 (10 カラム CSV) が出力される
+#   (#PBS -N "diffusion" が入るためジョブ名ベースのファイル名になる)
 ```
 
 Wisteria の場合は `run.wisteria.<mode>.sh` が PJM 形式で生成されるので `pjsub run.wisteria.<mode>.sh` で投入。
@@ -312,7 +316,7 @@ Wisteria の場合は `run.wisteria.<mode>.sh` が PJM 形式で生成される�
 標準出力例:
 ```
 # binary,N(=nx*ny*nz),time_sec,performance_gflops,error,real_sec,user_sec,sys_sec,num_time_steps_logged,last_sim_time
-./build-miyabi-uni/diffusion.uni.32,262144, 6.685e-02, 4.176e+01, 1.214e-05, 2.118e-01, 7.210e-02, 1.018e-01, 8192, 2.000e+00
+./build-miyabi-uni/diffusion.uni.32,262144, 6.685e-02, 4.176e+02, 1.214e-05, 2.118e-01, 7.210e-02, 1.018e-01, 8192, 2.000e+00
 ```
 
 出力フィールド (CSV、カンマ区切り、`BENCHMARK_MODE` 時):
@@ -368,7 +372,7 @@ kokkos:
 ### Step 1: 構成生成
 
 ```bash
-cd apps/diffusion
+cd diffusion
 ./configure.py --variant C++/kokkos/range/baseline --machine miyabi --mode gpu
 ```
 
@@ -514,9 +518,99 @@ CMake 段で上書きする方法も可能 (`cmake -B build -S . -D_NX=4 -D_NY=8
 # 例: Miyabi で C++ stdpar の GPU unified memory ビルド
 ./configure.py --variant C++/stdpar/auto.def --machine miyabi --mode uni
 
-# 内容だけ確認 (ファイル書き込まない)
+# ビルドファイルの内容だけ確認 (書き込まない)
 ./configure.py --variant C++/openacc/auto.def --machine local --mode gpu --dry-run
+
+# ジョブスクリプトの内容だけ確認 (書き込まない)
+./configure.py --variant C++/openacc/auto.def --machine local --mode gpu --dry-job
 ```
+
+### 生成物の削除 (`--clean` / `--allclean`)
+
+`configure.py --clean` で、`configure.py` とビルドが作った生成物を削除します。
+**実行結果の出力ファイルと `results/` は削除しません**。結果まで消して完全に初期状態へ
+戻したいときは `--allclean` を使います (`--allclean` でも `results/` は削除しません)。
+`summary/`, `machines/`, `docs/`, 各 variant の `src/`・`sh/`、手書きの
+`Makefile.<machine>[.<mode>]` はどちらでも対象外です。
+
+| 削除されるもの | 例 |
+|---|---|
+| configure.py の生成物 | `CMakeLists.txt` (先頭に `Generated by configure.py` を含むものだけ)、`Makefile.gen.<machine>.<mode>`、`run.<machine>.<mode>.sh` |
+| ビルド生成物 | `build-<machine>-<mode>/`、`*.o`、`*.mod`、`mod/`、バイナリ (`diffusion.<mode>.<FP>...`) |
+| ジョブ出力ログ | `diffusion.o<jobid>` (PBS)、`diffusion.<jobid>.out` / `.err` (PJM) |
+| 実行結果 (`--allclean` のみ) | (diffusion は標準出力のみなので該当なし) |
+
+```bash
+# 削除対象の一覧だけ表示 (削除しない)
+./configure.py --clean --dry-run
+
+# 確認プロンプトの後に削除 (実行結果は残る)
+./configure.py --clean
+
+# 実行結果まで削除 (results/ は残る)
+./configure.py --allclean
+
+# 確認なしで削除 (バッチ/スクリプトから)
+./configure.py --clean --yes
+
+# 対象を絞る (variant / machine / mode は任意に組み合わせ可)
+./configure.py --clean --variant F/openmp-cpu --machine wisteria --mode cpu
+```
+
+対話できない環境 (パイプ経由等) で `--yes` を付けずに実行した場合は、誤削除を防ぐため
+ERROR で終了します。
+
+
+### 演習モード (`--exercise`)
+
+「ビルド設定は GPU 版、ソースは CPU 版」の状態を用意して、**受講者が自分で
+ディレクティブを書き込む**ための作業ディレクトリを作ります。講習会で手作業の
+ファイルコピーを案内していた手順を、オプション 1 つで再現できます。
+
+```bash
+./configure.py --variant C++/openacc/auto.def --machine miyabi --mode gpu --exercise
+```
+
+これで `C++/openacc/auto.def.exercise/` が作られます。
+
+| 中身 | 由来 |
+|---|---|
+| `src/` | `diffusion` の **CPU OpenMP 版** (`<lang>/openmp-cpu/src`) のコピー。ディレクティブ未記述 |
+| `CMakeLists.txt` / `Makefile.gen.*` / `run.*.sh` | 指定した variant (`C++/openacc/auto.def`) と `--mode` のもの。つまり GPU 向け |
+| `EXERCISE.md` | 由来・答え合わせ・初期化のコマンドを書いた説明ファイル |
+
+参照実装 (答え) は元の variant にそのまま残るので、差分で確認できます。
+
+```bash
+diff -ru C++/openacc/auto.def.exercise/src C++/openacc/auto.def/src
+```
+
+作った演習ディレクトリは普通の variant として扱われます。`--list` にも
+`← 演習用 (--exercise で作成)` 付きで表示され、2 回目以降は次のように直接指定できます
+(このときソースは触られません)。
+
+```bash
+./configure.py --variant C++/openacc/auto.def.exercise --machine miyabi --mode gpu
+```
+
+| オプション | 意味 |
+|---|---|
+| `--exercise` | 演習ディレクトリを作る。**既存の `src/` は上書きしない** (受講者の編集を守る) |
+| `--exercise-reset` | 演習ソースを削除してコピー元から作り直す (編集は失われる) |
+| `--exercise-from VARIANT` | コピー元の variant を明示指定 (既定は同言語の `openmp-cpu`) |
+
+補足:
+
+- `--clean` / `--allclean` は演習ディレクトリの生成物だけを削除し、`src/` と
+  `EXERCISE.md` は残します
+- コピー元は同じ言語である必要があります (C++ のソースを Fortran のビルドに
+  渡すような指定は ERROR で拒否)
+- Kokkos variant を演習対象にする場合は、ソース構成が異なるため
+  `--exercise-from C++/kokkos/range/baseline` のように Kokkos variant の明示が必要です
+- `<lang>/<impl>` 形式の variant (`C++/openmp-cpu` 等) はコピー元そのものなので
+  演習対象にできません
+- 初回セットアップはディレクトリ作成を伴うため `--dry-run` / `--dry-job` とは併用
+  できません (作成後なら併用可)
 
 ### 引数の意味
 
@@ -533,6 +627,11 @@ CMake 段で上書きする方法も可能 (`cmake -B build -S . -D_NX=4 -D_NY=8
 | `--chunk` | no | int | Kokkos team chunk-sweep の `_CHUNK` |
 | `--opt-level` | no | `O0`〜`O4` / `fast` | ベース最適化レベル (`-O3` を上書き; 非 Kokkos のみ) |
 | `--extra-cflags` | no | str | 任意の追加 compile flag (例: `-xCORE-AVX512 -march=native`; 非 Kokkos のみ) |
+| `--exercise` | no | flag | 演習用 `<variant>.exercise` を作る (ビルド設定は指定 variant、`src/` は CPU OpenMP 版のコピー) |
+| `--exercise-reset` | no | flag | 演習ソースをコピー元から作り直す (編集は失われる) |
+| `--exercise-from` | no | str | 演習ソースのコピー元 variant (既定: 同言語の `openmp-cpu`) |
+| `--clean` | no | flag | 生成物を削除 (実行結果と `results/` は残す)。`--dry-run` で一覧のみ、`--yes` で確認省略、`--variant`/`--machine`/`--mode` で対象を絞る |
+| `--allclean` | no | flag | `--clean` に加えて実行結果の出力ファイルも削除 (`results/` は残す) |
 
 ### CLI オプションと variant 種別の対応表
 
@@ -544,17 +643,12 @@ CMake 段で上書きする方法も可能 (`cmake -B build -S . -D_NX=4 -D_NY=8
 | `--nthreads N` | ✓ **`auto.opt` / `manu.opt` の `openmp-target` / `openacc` のみ** | ✗ | `vector_length(NTHREADS)` を source で使うのが opt variant の omp-target/openacc のみ |
 | `--tile-nx/ny/nz N` | ✗ | ✓ **`mdrange/cpu-tile-sweep`, `mdrange/uvm-tile-sweep` のみ** | source の `_NX/_NY/_NZ` macro はこの 2 variant のみ |
 | `--chunk N` | ✗ | ✓ **`team/cpu-chunk-sweep`, `team/uvm-chunk-sweep` のみ** | source の `_CHUNK` macro はこの 2 variant のみ |
-| `--opt-level O0..O4\|fast` | ✓ 全 variant | ✗ | Kokkos は **インストール時** に opt が決定 (`spack install kokkos ... cflags=...`) |
-| `--extra-cflags "..."` | ✓ 全 variant | ✗ | 同上 (Kokkos インストール時に決定) |
+| `--opt-level O0..O4\|fast` | ✓ 全 variant (ベースフラグを置換) | △ アプリのコンパイル単位にのみ適用 | Kokkos ライブラリ本体の opt は **インストール時**に決まる (`spack install kokkos ... cflags=...`)。生成 CMakeLists では `target_compile_options` としてアプリ TU にだけ付く |
+| `--extra-cflags "..."` | ✓ 全 variant | △ 同上 | 同上 |
 
 #### 対応しない組み合わせを指定したときの ERROR 例
 
 ```
-$ ./configure.py --variant C++/kokkos/range/baseline --machine local --mode gpu --opt-level fast
-ERROR: --opt-level は非 Kokkos variant のみ実効です。variant 'C++/kokkos/range/baseline' (Kokkos) では指定不可。
-       Kokkos の最適化は spack install kokkos ... cxxstd=N cflags='...' 等でインストール時に決定されます。
-       対応 variant: 非 Kokkos (openmp-cpu, openmp-target, openacc, stdpar, do-concurrent)
-
 $ ./configure.py --variant C++/openmp-target/auto.def --machine local --mode gpu --nthreads 256
 ERROR: --nthreads は variant 'C++/openmp-target/auto.def' では実効しません。
        対応: openmp-target/openacc の auto.opt または manu.opt のみ。
@@ -572,7 +666,11 @@ spack install kokkos +cuda +openmp +wrapper cuda_arch=90 cxxstd=17 cflags="-O2"
 ```
 | `--list` | no | — | 使用可能な variant / machine を表示 |
 | `--info` | no | — | 設定一覧 (machine, compiler, 最適化, 精度) を 3 階層で表示 |
-| `--dry-run` | no | — | 生成内容を stdout に表示、書き込まない |
+| `--queue NAME` | no | str | ジョブスクリプトの投入キュー (PBS `-q` / PJM `-L rscgrp`)。省略時は machine yaml の `job.per_mode.<mode>.queue`。講習会用キューの指定に使う (例: `--queue tutorial-g`) |
+| `--group NAME` | no | str | ジョブスクリプトの課金グループ (PBS `group_list` / PJM `-g`)。省略時は `id -gn` で自動取得 |
+| `--kokkos-root PATH` | no | str | Kokkos の install prefix。省略時は machine yaml の `kokkos.root` を使い、それが placeholder (`/xxx/` 等) のときだけ `Kokkos_ROOT`/`KOKKOS_ROOT`、`CMAKE_PREFIX_PATH`、`~/kokkos/*`、`/opt/kokkos*`、`/usr/local`、spack から自動検出。見つからない場合は指定を促して終了 |
+| `--dry-run` | no | — | ビルドファイル (CMakeLists.txt / Makefile.gen.*) の生成内容を stdout に表示、書き込まない |
+| `--dry-job` | no | — | ジョブスクリプト (run.\<machine\>.\<mode\>.sh) の生成内容を stdout に表示、書き込まない。`--dry-run` と併用で両方 |
 
 ### CLI オプション例 (精度・最適化を直接指定)
 
@@ -608,7 +706,10 @@ spack install kokkos +cuda +openmp +wrapper cuda_arch=90 cxxstd=17 cflags="-O2"
 
 これらのオプションは生成される CMakeLists.txt の `CACHE STRING` 既定値や `CMAKE_<LANG>_FLAGS` を変えるだけなので、cmake -D で後から上書きも可能です (`--opt-level` と `--extra-cflags` は CMake 変数化していないので configure.py 再実行で変更)。
 
-**注意**: `--opt-level` と `--extra-cflags` は **Kokkos 以外** で実効します。Kokkos は **インストール時に最適化が決定**するため (`spack install kokkos +cuda +openmp ... cxxstd=20` 等)、configure.py からの上書きは無効です (警告を表示)。
+**注意**: `--opt-level` と `--extra-cflags` は Kokkos variant でもエラーにならず、生成 CMakeLists の
+`target_compile_options(<target> PRIVATE ...)` として **アプリのコンパイル単位にのみ** 適用されます。
+Kokkos ライブラリ本体の最適化は **インストール時に決定** (`spack install kokkos +cuda +openmp ... cxxstd=20` 等) なので、
+ライブラリ側まで変えたい場合は Kokkos を再インストールしてください。
 
 ### machine 情報の自動検出 (`local` のみ)
 
@@ -632,7 +733,7 @@ $ ./configure.py --variant C++/openmp-target/auto.def --machine local --mode gpu
 
 | 機能 | 説明 |
 |---|---|
-| **連動フィルタ** | category / machine / mode / language / impl / variant / memory_model / optimization_type / fp の 10 軸 |
+| **連動フィルタ** | machine / mode / language / impl / variant / memory_model / optimization_param / fp の 8 軸 (`category` と `optimization_type` は他の軸から一意に決まるためフィルタからは外し、色分け軸としてのみ残しています) |
 | **件数表示** | 各フィルタ項目に該当行数 `(N)` を表示。0 件の項目は自動的に灰色化 |
 | **X/Y 軸選択** | time_sec, performance_gflops, error, real_sec, N, nx 等から自由選択 |
 | **色分け** | impl, variant, memory_model, optimization_type 等で系列を分けられる |
@@ -643,10 +744,10 @@ $ ./configure.py --variant C++/openmp-target/auto.def --machine local --mode gpu
 
 | 項目 | 値 |
 |---|---|
-| 統合 CSV | `summary/diffusion.csv` (168 KB、907 行) |
-| 非 Kokkos 行 | 642 (mizuho 由来、Miyabi/Wisteria 実機計測) |
-| Kokkos 行 | 265 (kokkos_combined.csv 由来) |
-| grid サイズ N | 非 Kokkos: nx=32/64/128/256/512、Kokkos: nx=128 のみ |
+| 統合 CSV | `summary/diffusion.csv` (行数は計測を追記するたびに増えます) |
+| 非 Kokkos 行 | mizuho 由来 (Miyabi/Wisteria 実機計測) + 本リポジトリでの追試 |
+| Kokkos 行 | kokkos_combined.csv 由来 + Wisteria-A での N 依存性追試 |
+| grid サイズ N | nx=32/64/128/256/512 (非 Kokkos・Kokkos とも) |
 | machine | miyabi, wisteria |
 | 精度 | FP=32 / FP=64 |
 | impl 種類 | openmp-cpu, openmp-target, openacc, stdpar, do-concurrent, kokkos (6 種) |
@@ -676,7 +777,7 @@ time_sec, performance_gflops, error
 新しい計測データを `summary/diffusion.csv` に追加した後は、以下で HTML を再生成:
 
 ```bash
-cd apps/diffusion/summary
+cd diffusion/summary
 python3 visualize.py
 # → diffusion_dashboard.html (同ディレクトリ) が更新される
 # ブラウザが自動で開く (失敗時は手動でファイルを開く)
@@ -685,7 +786,7 @@ python3 visualize.py
 別の CSV / 出力先を指定:
 
 ```bash
-python3 apps/diffusion/summary/visualize.py path/to/data.csv path/to/dash.html
+python3 diffusion/summary/visualize.py path/to/data.csv path/to/dash.html
 ```
 
 ---

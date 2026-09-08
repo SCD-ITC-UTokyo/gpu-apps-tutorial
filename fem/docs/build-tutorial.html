@@ -246,7 +246,7 @@
 
 <header>
   <div class="breadcrumb">
-    <a href="../README.md">apps/fem/README.md</a> &raquo; docs/build-tutorial.html
+    <a href="../README.md">fem/README.md</a> &raquo; docs/build-tutorial.html
   </div>
   <h1>fem ビルドチュートリアル</h1>
   <p class="subtitle">3D 有限要素法 (FEM) 教材を、ビジュアル版で読むためのガイド</p>
@@ -281,7 +281,7 @@ OpenMP 経験者が GPU プログラミングモデルを横断的に学べる�
 <tbody>
 <tr><td>OpenMP CPU</td><td>✓ (C)</td><td>✓</td><td>OpenMP の伝統的な CPU 並列。出発点</td></tr>
 <tr><td>OpenMP target</td><td>✓ (C)</td><td>✓</td><td><code>omp target</code> で GPU 化 (移行コスト最小)</td></tr>
-<tr><td>OpenACC</td><td>✓ (C)</td><td>✓</td><td><code>acc kernels</code>。NVIDIA 中心</td></tr>
+<tr><td>OpenACC</td><td>✓ (C)</td><td>✓</td><td><code>acc parallel loop</code>。NVIDIA 中心</td></tr>
 <tr><td>言語標準 stdpar</td><td>✓ (C++)</td><td>—</td><td>C++17 <code>std::execution::par</code>。pragma 不要</td></tr>
 <tr><td>言語標準 do concurrent</td><td>—</td><td>✓</td><td>Fortran 2008 <code>do concurrent</code></td></tr>
 <tr><td>Kokkos</td><td>✓ (C++)</td><td>—</td><td>C++ ライブラリ。CPU/GPU portability</td></tr>
@@ -309,6 +309,7 @@ OpenMP 経験者が GPU プログラミングモデルを横断的に学べる�
 <tr><td>NVIDIA HPC SDK (NVHPC) 24.1 以降</td><td>必須 (GPU 系)</td><td>OpenMP target / OpenACC / stdpar / do-concurrent に</td></tr>
 <tr><td>CMake 3.20 以降</td><td>必須</td><td><code>apt install cmake</code></td></tr>
 <tr><td>Python 3.8 以降 + PyYAML</td><td>必須</td><td><code>pip install pyyaml</code></td></tr>
+<tr><td>pandas</td><td>任意</td><td><code>summary/visualize.py</code> でダッシュボードを再生成する場合のみ</td></tr>
 <tr><td>Kokkos 4.x / 5.x</td><td>任意</td><td>Kokkos 実装を試したい場合 (spack 推奨)</td></tr>
 </tbody>
 </table>
@@ -321,7 +322,7 @@ OpenMP 経験者が GPU プログラミングモデルを横断的に学べる�
 <h4>fem ディレクトリに移動</h4>
 <div class="code-block">
   <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
-<pre><code>cd apps/fem</code></pre>
+<pre><code>cd fem</code></pre>
 </div>
 </div>
 
@@ -347,17 +348,21 @@ cmake --build build-local-gpu</code></pre>
 <h4>実行 (引数は INPUT.DAT のパス)</h4>
 <div class="code-block">
   <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
-<pre><code>./build-local-gpu/fem.gpu.32 ../../input/INPUT.DAT</code></pre>
+<pre><code># variant ディレクトリは 3 階層なので input/ は ../../../ にある
+cp ../../../input/INPUT.DAT ../../../input/cube.0 .   # mesh は CWD 相対で探される
+./build-local-gpu/fem.gpu.32 INPUT.DAT</code></pre>
 </div>
 
-<p>引数 <code>64</code> は <span class="key">N (= nx × ny × nz の N、つまり 64×64×64 立方体)</span>
-を指定します (<code>./binary 64</code> で 262,144 格子点)。</p>
+<p>引数は <span class="key">制御ファイル INPUT.DAT のパス</span>です。メッシュファイル名 (<code>cube.0</code>)
+は INPUT.DAT の 1 行目に書かれており、<strong>カレントディレクトリから</strong>読まれます
+(同梱の <code>cube.0</code> は 65<sup>3</sup> 節点 = 274,625 節点、64<sup>3</sup> 六面体要素)。
+別サイズのメッシュは <code>python3 ../../../input/gen_cube.py 33 cube.0</code> のように生成できます。</p>
 
 <p>標準出力例 (CSV、10 カラム):</p>
 <div class="code-block">
   <div class="code-header"><span class="code-label">output</span><button class="copy-btn">コピー</button></div>
 <pre><code># binary,NP(=node_count),time_sec,performance_gflops,error,real_sec,user_sec,sys_sec,num_time_steps_logged,last_sim_time
-./build-local-gpu/fem.gpu.32,262144, 6.685e-02, 4.176e+01, 1.214e-05, 2.118e-01, 7.210e-02, 1.018e-01, 8192, 2.000e+00</code></pre>
+./build-local-gpu/fem.gpu.32,274625, 2.111e-01, 1.656e+01, 1.000e-08, 2.716e+00, 7.680e-01, 1.774e+00, 2000, 5.251e-02</code></pre>
 </div>
 </div>
 
@@ -376,7 +381,7 @@ cmake --build build-local-gpu</code></pre>
 <h2>ディレクトリ構成</h2>
 <div class="code-block">
   <div class="code-header"><span class="code-label">tree</span><button class="copy-btn">コピー</button></div>
-<pre><code>apps/fem/
+<pre><code>fem/
 ├── README.md
 ├── app.yaml                       # アプリのメタ情報
 ├── implementations.yaml           # impl × variant の軸定義
@@ -391,7 +396,7 @@ cmake --build build-local-gpu</code></pre>
 │   ├── openmp-target/{auto.def,...}/  # C コード (.c)
 │   ├── stdpar/{auto.def, auto.opt}/   # C++ コード (.cpp) + STL
 │   └── kokkos/
-│       ├── range/{baseline, cpu-sweep, uvm, uvm-sweep, baseline-fused, uvm-fused}/
+│       ├── range/{baseline, cpu-sweep, uvm, uvm-sweep}/
 │       ├── mdrange/{baseline, cpu-tile-sweep, uvm, uvm-tile-sweep}/
 │       └── team/{baseline, cpu-chunk-sweep, uvm, uvm-chunk-sweep}/
 ├── F/
@@ -400,11 +405,14 @@ cmake --build build-local-gpu</code></pre>
 │   ├── openmp-target/{auto.def, ...}/
 │   └── do-concurrent/{auto.def, auto.opt}/
 ├── results/                       # 読者の実行結果 (空)
+├── docs/
+│   └── build-tutorial.html        # ← このファイル
 └── summary/                       # 既測の公開データ + 可視化
-    ├── fem.csv              # 統合データ (Kokkos + 非 Kokkos)
-    ├── fem_dashboard.html   # インタラクティブ可視化
-    ├── visualize.py               # ダッシュボード生成器
-    └── docs/</code></pre>
+    ├── fem.csv                    # 統合データ (Kokkos + 非 Kokkos、18 列)
+    ├── fem_dashboard.html         # インタラクティブ可視化
+    ├── parse_logs.py              # 実行ログ → fem.csv 形式に変換
+    ├── parse_kokkos_logs.py       # Kokkos 実行ログ用
+    └── visualize.py               # ダッシュボード生成器</code></pre>
 </div>
 
 <div class="note">
@@ -425,7 +433,7 @@ C++ コンパイラ (nvc++, g++, icpx) は両方を処理できるので一つ�
 <thead><tr><th>軸</th><th>値</th><th>意味</th></tr></thead>
 <tbody>
 <tr><td rowspan="2">&lt;lang&gt;</td><td><code>C++</code> (ディレクトリ名)</td><td><span class="key">C/C++ ソース</span> (.c, .cpp) — C++ コンパイラで処理する言語ディレクトリ</td></tr>
-<tr><td><code>F</code></td><td>Fortran ソース (.f90)</td></tr>
+<tr><td><code>F</code></td><td>Fortran ソース (<code>.f</code> 固定形式)</td></tr>
 <tr><td rowspan="6">&lt;impl&gt;</td><td><code>openmp-cpu</code></td><td>OpenMP CPU マルチコア (ベースライン)</td></tr>
 <tr><td><code>openmp-target</code></td><td>OpenMP target offloading (5.0+)</td></tr>
 <tr><td><code>openacc</code></td><td>OpenACC</td></tr>
@@ -455,7 +463,7 @@ C++ コンパイラ (nvc++, g++, icpx) は両方を処理できるので一つ�
 <h4>構成生成</h4>
 <div class="code-block">
   <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
-<pre><code>cd apps/fem
+<pre><code>cd fem
 ./configure.py --variant C++/stdpar/auto.def --machine miyabi --mode uni</code></pre>
 </div>
 
@@ -514,46 +522,62 @@ make -f Makefile.gen.miyabi.uni</code></pre>
 
 <div class="step">
 <h4>実行 (ジョブスクリプトを投入)</h4>
-<p>Miyabi はバッチジョブ専用 (PBS Pro)。<code>configure.py</code> が <code>run.miyabi.uni.sh</code> を <span class="key">自動生成</span>するので、課金グループを書き換えて <code>qsub</code> で投入するだけです。以下は生成されるスクリプトの中身 (machine yaml の <code>job:</code> ブロックから組み立て):</p>
+<p>Miyabi はバッチジョブ専用 (PBS Pro)。<code>configure.py</code> が <code>run.miyabi.uni.sh</code> を <span class="key">自動生成</span>します。入力 (<code>INPUT.DAT</code>, <code>cube.0</code>) のコピーと実行行は生成済みで、課金グループ (<code>group_list</code>) にも <code>id -gn</code> の primary group が埋まるので、そのままで良ければ <code>qsub</code> するだけです (違う場合は <code>--group</code> で指定)。以下は実際に生成されるスクリプトの中身 (machine yaml の <code>job:</code> ブロックから組み立て):</p>
 
 <div class="code-block">
   <div class="code-header"><span class="code-label">run.miyabi.uni.sh (自動生成)</span><button class="copy-btn">コピー</button></div>
 <pre><code>#!/bin/bash
+# group_list: primary group (gz00) を自動検出。違う場合は --group で明示指定
+#PBS -N "fem"
+# queue: 'debug-g' (machine yaml の job.per_mode.uni.queue。--queue で上書き可)
 #PBS -q debug-g
 #PBS -l select=1:ompthreads=72
 #PBS -l walltime=00:10:00
-#PBS -W group_list=xxx       # ← 自分の課金グループに変更
+#PBS -W group_list=gz00
 #PBS -j oe
 
-module purge
-module load nvidia/25.9
-module list
+################################################################
+# 環境設定: コンピュートノードは module 未ロード状態で起動します。
+# ビルド時と同じ環境を再現してください (以下はこの machine の推奨例)。
+# 必要に応じて編集 / コメントアウト解除して使ってください。
+#
+#   module purge
+#   module load nvidia/25.9
+################################################################
 
 cd ${PBS_O_WORKDIR}
-
 export OMP_PROC_BIND=spread
 export OMP_PLACES=threads
 
-./build-miyabi-uni/fem.uni.32 ../../input/INPUT.DAT</code></pre>
+
+# === 実行 ===
+#   argv[1] は制御ファイル (INPUT.DAT)。メッシュファイル名 (cube.0) は
+#   INPUT.DAT の 1 行目に書かれており、カレントディレクトリから読まれる。
+#   そのため入力一式をカレントにコピーしてから実行する。
+INPUT_DIR=../../../input
+cp -f ${INPUT_DIR}/INPUT.DAT ${INPUT_DIR}/cube.0 .
+#   別サイズのメッシュを使う場合 (例: 33^3 節点):
+#     python3 ${INPUT_DIR}/gen_cube.py 33 cube.0
+./build-miyabi-uni/fem.uni.32 INPUT.DAT</code></pre>
 </div>
 
 <div class="code-block">
   <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
 <pre><code>qsub run.miyabi.uni.sh         # ジョブ投入
 qstat -u $USER                 # 状態確認
-# 完了後、run.miyabi.uni.sh.o&lt;jobid&gt; に標準出力が書き出される</code></pre>
+# 完了後、fem.o&lt;jobid&gt; に標準出力が書き出される (#PBS -N "fem" のため)</code></pre>
 </div>
 
 <div class="note">
 <p><span class="label">Wisteria の場合:</span>
-スケジューラは PJM (Fujitsu)。ディレクティブは <code>#PJM -L rscgrp=debug-a</code> / <code>#PJM -L node=1</code> / <code>#PJM --omp thread=72</code> / <code>#PJM -L elapse=00:10:00</code> / <code>#PJM -g xxx</code> / <code>#PJM -j</code>。投入コマンドは <code>pjsub run.wisteria.uni.sh</code>、状態確認は <code>pjstat</code>。</p>
+スケジューラは PJM (Fujitsu)。ディレクティブは <code>#PJM -L rscgrp=debug-a</code> / <code>#PJM -L node=1</code> / <code>#PJM --omp thread=72</code> / <code>#PJM -L elapse=00:10:00</code> / <code>#PJM -g xxx</code> / <code>#PJM -j</code>。課金グループは自動検出値が入ります。なお Wisteria は <code>uni</code> mode 非対応 (<code>modes: [gpu, cpu]</code>) なので、<code>--mode gpu</code> で生成した <code>run.wisteria.gpu.sh</code> を <code>pjsub</code> で投入します。状態確認は <code>pjstat</code>。</p>
 </div>
 
-<p>ジョブ出力ファイル (<code>*.o&lt;jobid&gt;</code>) の中身は 10 カラム CSV:</p>
+<p>ジョブ出力ファイル (<code>fem.o&lt;jobid&gt;</code>) に出る 10 カラム CSV:</p>
 <div class="code-block">
   <div class="code-header"><span class="code-label">output</span><button class="copy-btn">コピー</button></div>
 <pre><code># binary,NP(=node_count),time_sec,performance_gflops,error,real_sec,user_sec,sys_sec,num_time_steps_logged,last_sim_time
-./build-miyabi-uni/fem.uni.32,262144, 6.685e-02, 4.176e+01, 1.214e-05, 2.118e-01, 7.210e-02, 1.018e-01, 8192, 2.000e+00</code></pre>
+./build-miyabi-uni/fem.uni.32,274625, 2.111e-01, 1.656e+01, 1.000e-08, 2.716e+00, 7.680e-01, 1.774e+00, 2000, 5.251e-02</code></pre>
 </div>
 
 <p>出力フィールド:</p>
@@ -564,14 +588,24 @@ qstat -u $USER                 # 状態確認
 <tr><td>NP</td><td><strong>節点数 (DOF) — mesh で決まる (cube.0 = 274625)</strong></td><td>int</td></tr>
 <tr><td>time_sec</td><td>CG ソルバ計算時間</td><td>秒</td></tr>
 <tr><td>performance_gflops</td><td>演算性能 (FLOP / solver_time)</td><td>GFLOPS</td></tr>
-<tr><td>error</td><td><strong>CG 最終残差</strong> (収束時 ≤ INPUT.DAT の RESID 設定値)</td><td>float</td></tr>
+<tr><td>error</td><td><strong>INPUT.DAT の RESID 設定値</strong> (収束後の残差ではない。下の注意を参照)</td><td>float</td></tr>
 <tr><td>real_sec</td><td>プログラム全体の wall clock 時間</td><td>秒</td></tr>
 <tr><td>user_sec</td><td>user CPU 時間 (Fortran は cpu_time() 代用)</td><td>秒</td></tr>
 <tr><td>sys_sec</td><td>sys CPU 時間 (Fortran は 0.0 固定)</td><td>秒</td></tr>
-<tr><td>num_time_steps_logged</td><td><strong>CG 実反復回数 (ITERactual)</strong></td><td>int</td></tr>
+<tr><td>num_time_steps_logged</td><td><strong>INPUT.DAT の最大反復数 ITER</strong> (実反復数ではない。下の注意を参照)</td><td>int</td></tr>
 <tr><td>last_sim_time</td><td><strong>matrix assembly 時間</strong> (fem 特有: mat_sec)</td><td>秒</td></tr>
 </tbody>
 </table>
+
+<p><strong>注意 (<code>error</code> と <code>num_time_steps_logged</code>)</strong>:
+<code>SOLVE11()</code> は <code>ITERactual = ITER</code> としているが、<code>CG()</code> は
+<code>ITER</code> と <code>RESID</code> を値渡しで受け取るため、収束した反復数・残差は
+呼び出し元に戻らない。よって CSV の <code>error</code> は INPUT.DAT の収束判定値 (既定
+<code>1.0e-08</code>)、<code>num_time_steps_logged</code> は INPUT.DAT の最大反復数 (既定
+<code>2000</code>) がそのまま出力される。実際の反復履歴が必要な場合は
+<code>BENCHMARK_MODE</code> を外してビルドすると、標準出力に
+<code>&lt;反復数&gt; &lt;残差&gt;</code> が 1 行ずつ出る (同梱 <code>cube.0</code> + 既定設定なら
+197 反復・残差 8.292404e-09 で収束)。</p>
 
 <p><code>#</code> で始まる 1 行目は CSV のコメント行 (列名)。
 <code>awk '!/^#/'</code> や <code>pandas.read_csv(comment='#')</code> でデータ行だけ抽出できます。</p>
@@ -619,7 +653,7 @@ kokkos:
 <h4>構成生成</h4>
 <div class="code-block">
   <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
-<pre><code>cd apps/fem
+<pre><code>cd fem
 ./configure.py --variant C++/kokkos/range/baseline --machine miyabi --mode gpu</code></pre>
 </div>
 
@@ -670,27 +704,43 @@ cmake --build build-miyabi-gpu</code></pre>
 
 <div class="step">
 <h4>実行 (ジョブスクリプトを投入)</h4>
-<p>Miyabi はバッチジョブ専用 (PBS Pro)。<code>configure.py</code> が <code>run.miyabi.gpu.sh</code> を <span class="key">自動生成</span>するので、課金グループを書き換えて <code>qsub</code> で投入します。生成されるスクリプトの中身:</p>
+<p>Miyabi はバッチジョブ専用 (PBS Pro)。<code>configure.py</code> が <code>run.miyabi.gpu.sh</code> を <span class="key">自動生成</span>します。入力のコピーと実行行は生成済み、課金グループも自動検出値が埋まるので、そのままで良ければ <code>qsub</code> するだけです (違う場合は <code>--group</code> で指定)。生成されるスクリプトの中身:</p>
 
 <div class="code-block">
   <div class="code-header"><span class="code-label">run.miyabi.gpu.sh (自動生成)</span><button class="copy-btn">コピー</button></div>
 <pre><code>#!/bin/bash
+# group_list: primary group (gz00) を自動検出。違う場合は --group で明示指定
+#PBS -N "fem"
+# queue: 'debug-g' (machine yaml の job.per_mode.gpu.queue。--queue で上書き可)
 #PBS -q debug-g
 #PBS -l select=1:ompthreads=72
 #PBS -l walltime=00:10:00
-#PBS -W group_list=xxx       # ← 自分の課金グループに変更
+#PBS -W group_list=gz00
 #PBS -j oe
 
-module purge
-module load nvidia/25.9
-module list
+################################################################
+# 環境設定: コンピュートノードは module 未ロード状態で起動します。
+# ビルド時と同じ環境を再現してください (以下はこの machine の推奨例)。
+# 必要に応じて編集 / コメントアウト解除して使ってください。
+#
+#   module purge
+#   module load nvidia/25.9
+################################################################
 
 cd ${PBS_O_WORKDIR}
-
 export OMP_PROC_BIND=spread
 export OMP_PLACES=threads
 
-./build-miyabi-gpu/fem.gpu.32 ../../input/INPUT.DAT</code></pre>
+
+# === 実行 ===
+#   argv[1] は制御ファイル (INPUT.DAT)。メッシュファイル名 (cube.0) は
+#   INPUT.DAT の 1 行目に書かれており、カレントディレクトリから読まれる。
+#   そのため入力一式をカレントにコピーしてから実行する。
+INPUT_DIR=../../../input
+cp -f ${INPUT_DIR}/INPUT.DAT ${INPUT_DIR}/cube.0 .
+#   別サイズのメッシュを使う場合 (例: 33^3 節点):
+#     python3 ${INPUT_DIR}/gen_cube.py 33 cube.0
+./build-miyabi-gpu/fem.gpu.32 INPUT.DAT</code></pre>
 </div>
 
 <div class="code-block">
@@ -701,14 +751,14 @@ qstat -u $USER                 # 状態確認</code></pre>
 
 <div class="note">
 <p><span class="label">Wisteria の場合:</span>
-PJM (Fujitsu) スケジューラ。<code>#PJM -L rscgrp=debug-a</code> / <code>#PJM -L node=1</code> / <code>#PJM --omp thread=72</code> / <code>#PJM -L elapse=00:10:00</code> / <code>#PJM -g xxx</code> / <code>#PJM -j</code> を使い、投入は <code>pjsub run.wisteria.gpu.sh</code>。</p>
+PJM (Fujitsu) スケジューラ。<code>#PJM -L rscgrp=debug-a</code> / <code>#PJM -L node=1</code> / <code>#PJM --omp thread=72</code> / <code>#PJM -L elapse=00:10:00</code> / <code>#PJM -g gz00</code> (自動検出) / <code>#PJM -j</code> を使い、投入は <code>pjsub run.wisteria.gpu.sh</code>。</p>
 </div>
 
 <p>ジョブ出力 (<code>*.o&lt;jobid&gt;</code>) の中身:</p>
 <div class="code-block">
   <div class="code-header"><span class="code-label">output</span><button class="copy-btn">コピー</button></div>
 <pre><code># binary,NP(=node_count),time_sec,performance_gflops,error,real_sec,user_sec,sys_sec,num_time_steps_logged,last_sim_time
-./build-miyabi-gpu/fem.gpu.32,262144, 4.500e-02, 6.205e+02, 1.146e-05, 2.500e-01, 1.700e-01, 8.000e-02, 8192, 2.000e+00</code></pre>
+./build-miyabi-gpu/fem.gpu.32,274625, 4.334e-02, 8.067e+01, 1.000e-08, 2.252e+00, 5.874e-01, 1.586e+00, 2000, 7.113e-02</code></pre>
 </div>
 </div>
 
@@ -722,8 +772,6 @@ PJM (Fujitsu) スケジューラ。<code>#PJM -L rscgrp=debug-a</code> / <code>#
 <tr><td><code>range/cpu-sweep</code></td><td>RangePolicy</td><td>default</td><td>compile flag sweep 用</td></tr>
 <tr><td><code>range/uvm</code></td><td>RangePolicy</td><td>CudaUVMSpace</td><td>UVM のオーバーヘッドを観察</td></tr>
 <tr><td><code>range/uvm-sweep</code></td><td>RangePolicy</td><td>CudaUVMSpace</td><td>UVM + sweep</td></tr>
-<tr><td><code>range/baseline-fused</code></td><td>RangePolicy</td><td>default</td><td>3 重ループを 1 重に融合</td></tr>
-<tr><td><code>range/uvm-fused</code></td><td>RangePolicy</td><td>CudaUVMSpace</td><td>UVM + 融合</td></tr>
 <tr><td><code>mdrange/baseline</code></td><td>MDRangePolicy</td><td>default</td><td>baseline (tile = default)</td></tr>
 <tr><td><code>mdrange/cpu-tile-sweep</code></td><td>MDRangePolicy</td><td>default</td><td><code>_NX/_NY/_NZ</code> マクロ</td></tr>
 <tr><td><code>mdrange/uvm</code></td><td>MDRangePolicy</td><td>CudaUVMSpace</td><td>—</td></tr>
@@ -841,12 +889,23 @@ cmake -B build-miyabi-gpu -S . && cmake --build build-miyabi-gpu</code></pre>
 <tr><td><code>--extra-cflags</code></td><td>no</td><td>str</td><td>追加 compile flag (非 Kokkos のみ)</td></tr>
 <tr><td><code>--list</code></td><td>no</td><td>—</td><td>variant / machine 一覧</td></tr>
 <tr><td><code>--info</code></td><td>no</td><td>—</td><td>設定一覧 (3 階層)</td></tr>
-<tr><td><code>--dry-run</code></td><td>no</td><td>—</td><td>生成内容を stdout 表示</td></tr>
+<tr><td><code>--group</code></td><td>no</td><td>str</td><td>ジョブスクリプトの課金グループ (PBS <code>group_list</code> / PJM <code>-g</code>)。省略時は <code>id -gn</code> で自動取得</td></tr>
+<tr><td><code>--kokkos-root</code></td><td>no</td><td>str</td><td>Kokkos の install prefix。省略時は machine yaml の <code>kokkos.root</code> を使い、それが placeholder のときだけ <code>Kokkos_ROOT</code>/<code>KOKKOS_ROOT</code>、<code>CMAKE_PREFIX_PATH</code>、<code>~/kokkos/*</code> 等から自動検出。見つからない場合は指定を促して終了</td></tr>
+<tr><td><code>--queue</code></td><td>no</td><td>str</td><td>ジョブスクリプトの投入キュー (PBS <code>-q</code> / PJM <code>-L rscgrp</code>)。省略時は machine yaml の <code>job.per_mode.&lt;mode&gt;.queue</code>。<code>scheduler: none</code> の machine (local) に渡すと ERROR</td></tr>
+<tr><td><code>--dry-run</code></td><td>no</td><td>—</td><td>ビルドファイルの生成内容を stdout 表示 (書き込まない)</td></tr>
+<tr><td><code>--dry-job</code></td><td>no</td><td>—</td><td>ジョブスクリプトの生成内容を stdout 表示 (<code>--dry-run</code> と併用で両方)</td></tr>
+<tr><td><code>--clean</code></td><td>no</td><td>—</td><td>生成物と実行時コピー (<code>INPUT.DAT</code>, <code>cube.0</code>) を削除 (実行結果 <code>test.inp</code>/<code>log.log</code> と <code>results/</code> は残す)</td></tr>
+<tr><td><code>--allclean</code></td><td>no</td><td>—</td><td><code>--clean</code> に加えて <code>test.inp</code>, <code>log.log</code> も削除 (<code>results/</code> は残す)</td></tr>
+<tr><td><code>--yes</code>, <code>-y</code></td><td>no</td><td>—</td><td><code>--clean</code>/<code>--allclean</code> の確認プロンプトを省略 (非対話環境では必須)</td></tr>
 </tbody>
 </table>
 
 <h3>オプションと variant の対応 (重要)</h3>
-<p>対応しない組み合わせを指定すると <code>configure.py</code> が <span class="key">ERROR で拒否</span>します:</p>
+<p><code>--nthreads</code> / <code>--tile-nx/ny/nz</code> / <code>--chunk</code> は対応しない variant を指定すると
+<span class="key">ERROR で拒否</span>されます (静かに無視はしません)。
+<code>--opt-level</code> / <code>--extra-cflags</code> は Kokkos variant でも受理され、生成 CMakeLists の
+<code>target_compile_options</code> として<span class="key">アプリのコンパイル単位にのみ</span>適用されます
+(Kokkos ライブラリ本体はインストール時の設定のまま)。</p>
 
 <table>
 <thead><tr><th>オプション</th><th>非 Kokkos</th><th>Kokkos</th></tr></thead>
@@ -855,8 +914,8 @@ cmake -B build-miyabi-gpu -S . && cmake --build build-miyabi-gpu</code></pre>
 <tr><td><code>--nthreads</code></td><td>✓ <code>auto.opt</code>/<code>manu.opt</code> の <code>omp-target</code>/<code>openacc</code> のみ</td><td>✗</td></tr>
 <tr><td><code>--tile-nx/ny/nz</code></td><td>✗</td><td>✓ <code>mdrange/*-tile-sweep</code> のみ</td></tr>
 <tr><td><code>--chunk</code></td><td>✗</td><td>✓ <code>team/*-chunk-sweep</code> のみ</td></tr>
-<tr><td><code>--opt-level</code></td><td>✓ 全 variant</td><td>✗ (Kokkos インストール時に決定)</td></tr>
-<tr><td><code>--extra-cflags</code></td><td>✓ 全 variant</td><td>✗ (Kokkos インストール時に決定)</td></tr>
+<tr><td><code>--opt-level</code></td><td>✓ 全 variant (ベースフラグを置換)</td><td>△ アプリ TU にのみ <code>target_compile_options</code> として適用 (Kokkos 本体はインストール時の設定)</td></tr>
+<tr><td><code>--extra-cflags</code></td><td>✓ 全 variant</td><td>△ 同上</td></tr>
 </tbody>
 </table>
 
@@ -923,9 +982,9 @@ cmake -B build-miyabi-gpu -S . && cmake --build build-miyabi-gpu</code></pre>
 <table>
 <thead><tr><th>機能</th><th>説明</th></tr></thead>
 <tbody>
-<tr><td>連動フィルタ</td><td>category / machine / mode / language / impl / variant / memory_model / optimization_type / fp の 10 軸</td></tr>
+<tr><td>連動フィルタ</td><td>machine / mode / language / impl / variant / memory_model / optimization_param / fp の 8 軸 (<code>category</code> と <code>optimization_type</code> は他の軸から一意に決まるためフィルタからは外し、色分け軸としてのみ残しています)</td></tr>
 <tr><td>件数表示</td><td>各フィルタ項目に該当行数 <code>(N)</code> を表示。0 件の項目は自動的に灰色化</td></tr>
-<tr><td>X/Y 軸選択</td><td><code>time_sec</code>, <code>performance_gflops</code>, <code>error</code>, <code>real_sec</code>, <code>N</code>, <code>nx</code> 等から自由選択</td></tr>
+<tr><td>X/Y 軸選択</td><td><code>N</code>, <code>time_sec</code>, <code>performance_gflops</code>, <code>error</code>, <code>real_sec</code>, <code>user_sec</code>, <code>sys_sec</code> 等から自由選択 (fem に <code>nx/ny/nz</code> は無い)</td></tr>
 <tr><td>色分け</td><td><code>impl</code>, <code>variant</code>, <code>memory_model</code>, <code>optimization_type</code> 等で系列を分けられる</td></tr>
 <tr><td>グラフ種別</td><td>散布図 / 折れ線 / 棒 / 箱ひげ / ヒストグラム</td></tr>
 <tr><td>対数軸切替</td><td>X/Y それぞれ線形/対数</td></tr>
@@ -936,10 +995,10 @@ cmake -B build-miyabi-gpu -S . && cmake --build build-miyabi-gpu</code></pre>
 <table>
 <thead><tr><th>項目</th><th>値</th></tr></thead>
 <tbody>
-<tr><td>統合 CSV</td><td><code>summary/fem.csv</code> (168 KB、907 行)</td></tr>
-<tr><td>非 Kokkos 行</td><td>642 (mizuho 由来、Miyabi/Wisteria 実機計測)</td></tr>
-<tr><td>Kokkos 行</td><td>265</td></tr>
-<tr><td>grid サイズ N</td><td>非 Kokkos: nx=32/64/128/256/512、Kokkos: nx=128 のみ</td></tr>
+<tr><td>統合 CSV</td><td><code>summary/fem.csv</code> (行数は計測を追記するたびに増えます)</td></tr>
+<tr><td>非 Kokkos 行</td><td>379 (mizuho 由来 + 本リポジトリでの追試、Miyabi/Wisteria 実機計測)</td></tr>
+<tr><td>Kokkos 行</td><td>76</td></tr>
+<tr><td>問題サイズ NP</td><td>4913 (17<sup>3</sup>) / 35937 (33<sup>3</sup>) / 274625 (65<sup>3</sup>) / 2146689 (129<sup>3</sup>)</td></tr>
 <tr><td>machine</td><td>miyabi, wisteria</td></tr>
 <tr><td>精度</td><td>FP=32 / FP=64</td></tr>
 <tr><td>impl 種類</td><td>openmp-cpu, openmp-target, openacc, stdpar, do-concurrent, kokkos (6 種)</td></tr>
@@ -973,7 +1032,7 @@ real_sec, user_sec, sys_sec, source_file</code></pre>
 
 <div class="code-block">
   <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
-<pre><code>cd apps/fem/summary
+<pre><code>cd fem/summary
 python3 visualize.py
 # → fem_dashboard.html (同ディレクトリ) が更新される
 # ブラウザが自動で開く (失敗時は手動でファイルを開く)</code></pre>
@@ -982,7 +1041,7 @@ python3 visualize.py
 <p>別の CSV / 出力先を指定:</p>
 <div class="code-block">
   <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
-<pre><code>python3 apps/fem/summary/visualize.py path/to/data.csv path/to/dash.html</code></pre>
+<pre><code>python3 fem/summary/visualize.py path/to/data.csv path/to/dash.html</code></pre>
 </div>
 
 </section>
@@ -1046,18 +1105,18 @@ pip install cmake</code></pre>
 <p>INPUT.DAT のパス引数を渡し忘れ:</p>
 <div class="code-block">
   <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
-<pre><code>./build-local-gpu/fem.gpu.32 ../../input/INPUT.DAT    # ← この INPUT.DAT のパスが必須</code></pre>
+<pre><code>./build-local-gpu/fem.gpu.32 INPUT.DAT    # ← 制御ファイルのパスが必須 (../../../input/INPUT.DAT でも可)</code></pre>
 </div>
 </details>
 
 <details>
 <summary>計算結果が <code>NaN</code> や <code>inf</code> になる</summary>
-<p>FP32 で N が大きすぎる、あるいは dt 設定で発散している可能性。FP64 で再ビルドして確認:</p>
+<p>FP32 では CG の残差計算が丸め誤差で停滞することがあります (fem は定常解を解くので時間刻み <code>dt</code> はありません)。FP64 で再ビルドして確認:</p>
 <div class="code-block">
   <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
 <pre><code>cmake -B build-local-gpu-fp64 -S . -DFP=64
 cmake --build build-local-gpu-fp64
-./build-local-gpu-fp64/fem.gpu.64 64</code></pre>
+./build-local-gpu-fp64/fem.gpu.64 INPUT.DAT     # INPUT.DAT と cube.0 は CWD にコピー済みとする</code></pre>
 </div>
 </details>
 
@@ -1072,9 +1131,9 @@ nvidia-smi
 nvidia-smi -l 1
 
 # 実行時環境変数で GPU 詳細出力
-NVCOMPILER_ACC_NOTIFY=1 ./build-local-gpu/fem.gpu.32 128</code></pre>
+NVCOMPILER_ACC_NOTIFY=1 ./build-local-gpu/fem.gpu.32 INPUT.DAT</code></pre>
 </div>
-<p>N が小さすぎると GPU を使い切れず CPU より遅いこともある。N=128 以上で再評価。</p>
+<p>メッシュが小さすぎると GPU を使い切れず CPU より遅いこともある。<code>gen_cube.py</code> で大きいメッシュを作って再評価する。</p>
 </details>
 
 <details>
@@ -1088,6 +1147,23 @@ spack install kokkos +cuda +openmp +wrapper cuda_arch=120 cxxstd=20</code></pre>
 </details>
 
 <details>
+<summary>stdpar / do-concurrent が GPU で動かない (<code>will run sequentially when compiled for a compute capability less than cc70</code>)</summary>
+<p><code>-stdpar=gpu</code> を付けていても、compute capability を明示しないと nvc++ / nvfortran はコンパイル時のホストで既定の cc を選ぶ。GPU の無いログインノードでビルドすると cc70 未満になり、<code>std::execution::par</code> / <code>do concurrent</code> は<strong>警告だけ出して逐次コードに退化する</strong> (エラーにならないので気付きにくい)。</p>
+<p>machine yaml の <code>gpu.common_flags</code> に実機の arch を入れる。<code>machines/wisteria.yaml</code> は Aquarius = A100 なので <code>-gpu=cc80</code> を指定済み。</p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">yaml</span><button class="copy-btn">コピー</button></div>
+<pre><code>gpu:
+  common_flags: ["-tp=native", "-gpu=cc80", "-O3", "-I.", "-Wall", "-Minfo=accel,opt,mp"]</code></pre>
+</div>
+<p>ビルドログに上記の警告が残っていないことで確認できる。</p>
+</details>
+
+<details>
+<summary><code>error: global or namespace scope variables ... cannot be accessed from device code</code></summary>
+<p>stdpar でオフロードを有効にしたときに出る。C++ のラムダはグローバル変数をキャプチャしないため、ファイルスコープの変数をラムダ内から参照するとデバイス側に渡らない。ラムダの外でローカル変数に束縛し直し、<code>[&amp;]</code> ではなく <code>[=]</code> で値キャプチャする。要素ごとの作業配列をファイルスコープに置いている場合は、並列化するとデータ競合になるのでラムダ内のローカル変数にする。</p>
+</details>
+
+<details>
 <summary><code>compiler 'intel' は machine 'wisteria' に定義されていない</code></summary>
 <p>エラーメッセージに使用可能な選択肢が表示される。指示通り <code>--compiler gcc</code> 等で再実行。</p>
 </details>
@@ -1098,8 +1174,8 @@ spack install kokkos +cuda +openmp +wrapper cuda_arch=120 cxxstd=20</code></pre>
 
 <footer>
   <p>fem ビルドチュートリアル<br>
-  <code>apps/fem/docs/build-tutorial.html</code> &middot;
-  README: <a href="../README.md">apps/fem/README.md</a></p>
+  <code>fem/docs/build-tutorial.html</code> &middot;
+  README: <a href="../README.md">fem/README.md</a></p>
 </footer>
 
 <script>

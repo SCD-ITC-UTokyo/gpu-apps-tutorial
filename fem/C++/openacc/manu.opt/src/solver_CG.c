@@ -62,7 +62,8 @@ void  CG  (
   TOL   = RESID;          
 
 #pragma acc parallel loop   \
-  private(i)
+  private(i)   \
+  vector_length(NTHREADS)
   for(i=0;i<NP;i++){
     X[i]=0.0;	
     //    WW[R][i]=0.0;
@@ -82,7 +83,8 @@ void  CG  (
    +-----------------------+
 **/
 #pragma acc parallel loop \
-  private(i,j,WVAL)
+  private(i,j,WVAL)   \
+  vector_length(NTHREADS)
   for(i=0;i<NP;i++){
     //    WW[DD][i]= 1.0/D[i];
     DW[i]= 1.0/D[i];
@@ -97,7 +99,8 @@ void  CG  (
   
   BNRM2= 0.e0;
 #pragma acc parallel loop \
-  private(i) reduction(+:BNRM2)
+  private(i) reduction(+:BNRM2)   \
+  vector_length(NTHREADS)
   for(i=0;i<NP;i++){
     BNRM2+= B[i]*B[i];
   }
@@ -117,7 +120,8 @@ void  CG  (
    +----------------+
 **/
 #pragma acc parallel loop \
-  private(i)
+  private(i)   \
+  vector_length(NTHREADS)
     for(i=0;i<NP;i++){
       //      WW[Z][i]= WW[DD][i]*WW[R][i];
       ZW[i]= DW[i]*RW[i];
@@ -129,7 +133,8 @@ void  CG  (
 **/
     RHO= 0.e0;
 #pragma acc parallel loop \
-  private(i) reduction(+:RHO)
+  private(i) reduction(+:RHO)   \
+  vector_length(NTHREADS)
     for(i=0;i<NP;i++){
       //      RHO+= WW[R][i]*WW[Z][i];
       RHO+= RW[i]*ZW[i];
@@ -142,7 +147,8 @@ void  CG  (
 **/
     if( ITER == 1 ){
 #pragma acc parallel loop \
-  private(i)
+  private(i)   \
+  vector_length(NTHREADS)
       for(i=0;i<NP;i++){
 	//	WW[P][i]=WW[Z][i];
 	PW[i]=ZW[i];
@@ -150,7 +156,8 @@ void  CG  (
     }else{
       BETA= RHO / RHO1;
 #pragma acc parallel loop \
-  private(i)
+  private(i)   \
+  vector_length(NTHREADS)
       for(i=0;i<NP;i++){
 	//	WW[P][i]=WW[Z][i] + BETA*WW[P][i];
 	PW[i]=ZW[i] + BETA*PW[i];
@@ -162,7 +169,8 @@ void  CG  (
    +-------------+
 **/      
 #pragma acc parallel loop \
-  private(i,j,WVAL)
+  private(i,j,WVAL)   \
+  vector_length(NTHREADS)
     for( i=0;i<NP;i++){
       //      WVAL= D[i] * WW[P][i];
       WVAL= D[i] * PW[i];
@@ -181,7 +189,8 @@ void  CG  (
 **/
     C1= 0.e0;
 #pragma acc parallel loop \
-  private(i) reduction(+:C1)
+  private(i) reduction(+:C1)   \
+  vector_length(NTHREADS)
     for(i=0;i<NP;i++){
       //      C1+=WW[P][i]*WW[Q][i];
       C1+=PW[i]*QW[i];
@@ -195,7 +204,8 @@ void  CG  (
    +----------------------+
 **/
 #pragma acc parallel loop \
-  private(i)
+  private(i)   \
+  vector_length(NTHREADS)
     for(i=0;i<NP;i++){
       //      X [i]   +=  ALPHA *WW[P][i];
       X [i]   +=  ALPHA *PW[i];
@@ -205,7 +215,8 @@ void  CG  (
   
     DNRM2= 0.e0;
 #pragma acc parallel loop \
-  private(i) reduction(+:DNRM2)
+  private(i) reduction(+:DNRM2)   \
+  vector_length(NTHREADS)
     for(i=0;i<NP;i++){
       //      DNRM2+=WW[R][i]*WW[R][i];
       DNRM2+=RW[i]*RW[i];

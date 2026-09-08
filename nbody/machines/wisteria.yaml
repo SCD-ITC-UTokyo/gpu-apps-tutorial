@@ -30,7 +30,9 @@ cpu:
 
 gpu:
   # Wisteria は NVHPC 24.1 系のため、古い -gpu=managed 文法を使用
-  common_flags: ["-tp=native", "-O3", "-I.", "-Wall", "-Minfo=accel,opt,mp"]
+  # Aquarius = A100 (cc80)。stdpar は cc を明示しないと
+  # std::execution::par が cc<70 向けコード生成となり逐次実行に退化する。
+  common_flags: ["-tp=native", "-gpu=cc80", "-O3", "-I.", "-Wall", "-Minfo=accel,opt,mp"]
   compiler:
     cc:  { cmd: nvc,       flags: [] }
     cxx: { cmd: nvc++,     flags: [-std=c++17] }
@@ -52,8 +54,8 @@ job:
   # modules はジョブスクリプト生成時に「推奨例」コメントとして出るのみ。自動 load されない。
   # 実際の module load はユーザがビルド env と合わせて手動で行う。
   per_mode:
-    gpu: { queue: debug-a, omp_threads: 72, modules: ["nvidia", "hdf5/1.14.6", "boost/1.83"] }
-    cpu: { queue: debug-o, omp_threads: 48, modules: ["gcc/12.2.0", "hdf5/1.14.6", "boost/1.83"] }
+    gpu: { queue: debug-a, omp_threads: 72, modules: ["nvidia"] }
+    cpu: { queue: debug-o, omp_threads: 48, modules: ["gcc/12.2.0"] }
   env:
     - "OMP_PROC_BIND=spread"
     - "OMP_PLACES=threads"

@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
 #include "pfem_util.h"
 
 #include <numeric>   // std::transform_reduce
@@ -20,7 +21,7 @@ extern FILE *fp_log;
  **/
 static inline void JACOBI(
 	    KREAL DETJ[2][2][2],
-	    KREAL PNQ[2][2][8],KREAL PNE[2][2][8],KREAL PNT[2][2][8],
+	    const KREAL PNQ[2][2][8],const KREAL PNE[2][2][8],const KREAL PNT[2][2][8],
 	    KREAL PNX[2][2][2][8],KREAL PNY[2][2][2][8],KREAL PNZ[2][2][2][8],
 	    KREAL X1,KREAL X2,KREAL X3,KREAL X4,KREAL X5,KREAL X6,KREAL X7,KREAL X8,
 	    KREAL Y1,KREAL Y2,KREAL Y3,KREAL Y4,KREAL Y5,KREAL Y6,KREAL Y7,KREAL Y8,
@@ -332,15 +333,44 @@ void MAT_ASS_MAIN()
     }
   }
 
+  /**
+   ** stdpar GPU offload: namespace-scope objects cannot be referenced from
+   ** device code, so bind them to block-local objects that the lambda below
+   ** captures by value.
+   **/
+  {
+  KREAL PNQ[2][2][8], PNE[2][2][8], PNT[2][2][8];
+  KREAL SHAPE[2][2][2][8], WEI[2];
+  memcpy(PNQ  , ::PNQ  , sizeof(PNQ)  );
+  memcpy(PNE  , ::PNE  , sizeof(PNE)  );
+  memcpy(PNT  , ::PNT  , sizeof(PNT)  );
+  memcpy(SHAPE, ::SHAPE, sizeof(SHAPE));
+  memcpy(WEI  , ::WEI  , sizeof(WEI)  );
+  const KREAL O8th= ::O8th;
+  const KREAL COND= ::COND;
+  const KREAL QVOL= ::QVOL;
+  KINT  *const ICELNOD= ::ICELNOD;
+  KREAL *const XYZ    = ::XYZ;
+  KINT  *const indexLU= ::indexLU;
+  KINT  *const itemLU = ::itemLU;
+  KREAL *const AMAT   = ::AMAT;
+  KREAL *const B      = ::B;
+  KREAL *const D      = ::D;
+
   for( icol=1; icol< ELMCOLORtot+1; icol++){
 
     std::for_each_n
     ( std::execution::par,
       boost::iterators::counting_iterator<int32_t>(ELMCOLORindex[icol-1]),
       ELMCOLORindex[icol] - ELMCOLORindex[icol-1],
-      [&](int icel0)
+      [=](int icel0)
     {
       int icel = ELMCOLORitem[icel0];
+
+      /** per-element scratch (cf. local(...) of the do-concurrent version) **/
+      KREAL DETJ[2][2][2];
+      KREAL PNX[2][2][2][8],PNY[2][2][2][8],PNZ[2][2][2][8];
+
     
       int in1=ICELNOD[icel*8+0];
       int in2=ICELNOD[icel*8+1];
@@ -468,6 +498,7 @@ void MAT_ASS_MAIN()
     }); // icel0
 
   } // icol
+  } // local bindings
 
   free(IWKX);
   free(ELMCOLORindex);

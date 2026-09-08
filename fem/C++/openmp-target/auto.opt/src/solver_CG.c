@@ -61,8 +61,9 @@ void  CG  (
   MAXIT  = ITER;
   TOL   = RESID;          
 
-#pragma acc parallel loop   \
-  private(i)
+#pragma omp target teams distribute parallel for   \
+  private(i)   \
+  thread_limit(NTHREADS)
   for(i=0;i<NP;i++){
     X[i]=0.0;	
     //    WW[R][i]=0.0;
@@ -81,8 +82,9 @@ void  CG  (
    | {r0}= {b} - [A]{xini} |
    +-----------------------+
 **/
-#pragma acc parallel loop \
-  private(i,j,WVAL)
+#pragma omp target teams distribute parallel for \
+  private(i,j,WVAL)   \
+  thread_limit(NTHREADS)
   for(i=0;i<NP;i++){
     //    WW[DD][i]= 1.0/D[i];
     DW[i]= 1.0/D[i];
@@ -96,8 +98,9 @@ void  CG  (
   }
   
   BNRM2= 0.e0;
-#pragma acc parallel loop \
-  private(i) reduction(+:BNRM2)
+#pragma omp target teams distribute parallel for \
+  private(i) reduction(+:BNRM2)   \
+  thread_limit(NTHREADS)
   for(i=0;i<NP;i++){
     BNRM2+= B[i]*B[i];
   }
@@ -116,8 +119,9 @@ void  CG  (
    | {z}= [Minv]{r} |
    +----------------+
 **/
-#pragma acc parallel loop \
-  private(i)
+#pragma omp target teams distribute parallel for \
+  private(i)   \
+  thread_limit(NTHREADS)
     for(i=0;i<NP;i++){
       //      WW[Z][i]= WW[DD][i]*WW[R][i];
       ZW[i]= DW[i]*RW[i];
@@ -128,8 +132,9 @@ void  CG  (
    +---------------+
 **/
     RHO= 0.e0;
-#pragma acc parallel loop \
-  private(i) reduction(+:RHO)
+#pragma omp target teams distribute parallel for \
+  private(i) reduction(+:RHO)   \
+  thread_limit(NTHREADS)
     for(i=0;i<NP;i++){
       //      RHO+= WW[R][i]*WW[Z][i];
       RHO+= RW[i]*ZW[i];
@@ -141,16 +146,18 @@ void  CG  (
    +-----------------------------+
 **/
     if( ITER == 1 ){
-#pragma acc parallel loop \
-  private(i)
+#pragma omp target teams distribute parallel for \
+  private(i)   \
+  thread_limit(NTHREADS)
       for(i=0;i<NP;i++){
 	//	WW[P][i]=WW[Z][i];
 	PW[i]=ZW[i];
       }
     }else{
       BETA= RHO / RHO1;
-#pragma acc parallel loop \
-  private(i)
+#pragma omp target teams distribute parallel for \
+  private(i)   \
+  thread_limit(NTHREADS)
       for(i=0;i<NP;i++){
 	//	WW[P][i]=WW[Z][i] + BETA*WW[P][i];
 	PW[i]=ZW[i] + BETA*PW[i];
@@ -161,8 +168,9 @@ void  CG  (
    | {q}= [A]{p} |
    +-------------+
 **/      
-#pragma acc parallel loop \
-  private(i,j,WVAL)
+#pragma omp target teams distribute parallel for \
+  private(i,j,WVAL)   \
+  thread_limit(NTHREADS)
     for( i=0;i<NP;i++){
       //      WVAL= D[i] * WW[P][i];
       WVAL= D[i] * PW[i];
@@ -180,8 +188,9 @@ void  CG  (
    +---------------------+
 **/
     C1= 0.e0;
-#pragma acc parallel loop \
-  private(i) reduction(+:C1)
+#pragma omp target teams distribute parallel for \
+  private(i) reduction(+:C1)   \
+  thread_limit(NTHREADS)
     for(i=0;i<NP;i++){
       //      C1+=WW[P][i]*WW[Q][i];
       C1+=PW[i]*QW[i];
@@ -194,8 +203,9 @@ void  CG  (
    | {r}= {r} - ALPHA*{q} |
    +----------------------+
 **/
-#pragma acc parallel loop \
-  private(i)
+#pragma omp target teams distribute parallel for \
+  private(i)   \
+  thread_limit(NTHREADS)
     for(i=0;i<NP;i++){
       //      X [i]   +=  ALPHA *WW[P][i];
       X [i]   +=  ALPHA *PW[i];
@@ -204,8 +214,9 @@ void  CG  (
     }
   
     DNRM2= 0.e0;
-#pragma acc parallel loop \
-  private(i) reduction(+:DNRM2)
+#pragma omp target teams distribute parallel for \
+  private(i) reduction(+:DNRM2)   \
+  thread_limit(NTHREADS)
     for(i=0;i<NP;i++){
       //      DNRM2+=WW[R][i]*WW[R][i];
       DNRM2+=RW[i]*RW[i];

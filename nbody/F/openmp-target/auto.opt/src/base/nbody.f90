@@ -14,11 +14,11 @@
 !!!  - Optimization: -Mfprelaxed=rsqrt vector_length(128)
 
 module nbody
+  use type
   use cfg
   use io
   use conservatives
   use init
-  use util_hdf5
   use util_timer
   implicit none
 
@@ -288,7 +288,10 @@ program main
   use nbody
   implicit none
 
-  type(c_ptr) :: time_to_solution, config, error, timer
+  !! C++ 実装への c_ptr ハンドルから Fortran の派生型へ置き換え
+  type(timer_t)         :: time_to_solution, timer
+  type(config_t)        :: config
+  type(conservatives_t) :: error
 
   integer :: argc
   integer, parameter :: arglen = 256
@@ -364,8 +367,6 @@ program main
   eps_inv = 1.0/eps
 #endif
 
-  call util_hdf5_commit_datatype_vec3()
-  call util_hdf5_commit_datatype_vec4()
 #endif !! not BENCHMARK_MODE
 
   do i=1, num_bin
@@ -394,9 +395,8 @@ program main
      call trim_acc( num, acc )
 #endif !! CALCULATE_POTENTIAL
 
-     !! write the first snapshot
+     !! 初回スナップショット時刻での保存量誤差の記録 (HDF5 出力は廃止済み)
      error = conservatives_constructor()
-     call io_write_snapshot( num, pos, vel, acc, file, 32, present, time, error )
 
      !! half-step integration for velocity
      call kick( num, vel, acc, real(0.5,fp_m)*dt )
@@ -419,14 +419,13 @@ program main
 #endif !! CALCULATE_POTENTIAL
         call kick( num, vel, acc, dt )
 
-        !! write snapshot
+        !! スナップショット時刻の更新 (HDF5 出力は廃止済み)
         if( present > previous ) then
            previous = present
            time_from_snapshot = 0.0
            time = time + snapshot_interval
 
            call kick_backward_half( num, vel, acc, vel_tmp, dt )
-           call io_write_snapshot( num, pos, vel_tmp, acc, file, 32, present, time, error )
         end if ! present > previous
      end do ! while( present < snp_fin )
      !!---- end not BENCHMARK_MODE
@@ -470,8 +469,6 @@ program main
   end do ! i
   
 #ifndef BENCHMARK_MODE
-  call util_hdf5_remove_datatype_vec3()
-  call util_hdf5_remove_datatype_vec4()
 
   call util_timer_stop( time_to_solution )
 

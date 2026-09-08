@@ -1,236 +1,73 @@
 #!/usr/bin/env python3
+"""fem の Kokkos 実装の標準出力から 10 列ベンチマーク CSV を復元する。
+
+fem の Kokkos 実装 (C++/kokkos/*/*) は非 Kokkos 実装と違い BENCHMARK_MODE を
+持たず、10 列 CSV を出力しない。出力されるのは
+
+    *** matrix conn. <sec> sec.
+    <iter> <resid>            ... CG 反復履歴
+    *** solver       <sec> sec.
+    <node> <value>            ... 原点節点の解
+
+だけなので、非 Kokkos 実装 (solver_CG.c) と同じ FLOP 式
+
+    FLOP = ITER*(NP*14 + NPLU*2) + NP*3 + NPLU*2
+
+を使って performance_gflops を復元する。NPLU (対角を除く非零要素数) は
+構造格子六面体メッシュでは解析的に求まる:
+
+    NPLU(n) = (3n-2)^3 - n^3        (n = 一辺の節点数)
+
+この式は非 Kokkos 実装が実測で出力した GFlops から逆算した値と一致する
+(65^3: 6,914,432)。
 """
-results/<machine>/*.log を fem.csv 形式 (21 カラム) に集約変換する。
+import argparse, os, re, sys
 
-注: fem アプリ専用 (diffusion 版とは独立)。
-    21 カラムスキーマ自体は diffusion と同一だが、列の意味解釈が fem 固有:
-      N        = NP (節点数, DOF)
-      error    = CG 最終残差
-      num_time_steps_logged = CG 反復回数
-      last_sim_time         = matrix assembly 時間
+def nplu(n):            # n = nodes per side
+    return (3*n - 2)**3 - n**3
 
-バイナリ自身は 10 カラム CSV を出力 (`# binary,NP,time_sec,...`):
-    # binary,NP,time_sec,performance_gflops,error,real_sec,user_sec,sys_sec,num_time_steps_logged,last_sim_time
-    ./build-local-gpu/fem.gpu.32,274625,3.21e-01,1.47e+01,8.03e-09,...
+def parse(path):
+    txt = open(path).read()
+    it = re.findall(r'^(\d+) ([0-9.eE+-]+)\s*$', txt, re.M)
+    if not it:
+        return None
+    iters, resid = int(it[-1][0]), float(it[-1][1])
+    m_s = re.search(r'\*\*\* solver\s+([0-9.eE+-]+) sec', txt)
+    m_m = re.search(r'\*\*\* matrix conn\.\s+([0-9.eE+-]+) sec', txt)
+    if not m_s:
+        return None
+    return iters, resid, float(m_s.group(1)), float(m_m.group(1)) if m_m else 0.0
 
-このスクリプトはそれを読み、バイナリパスから category/machine/mode/language/impl/variant/
-memory_model/optimization_type/optimization_param/fp の 8 カラムを推論して
-18 カラム CSV に変換出力する (fem は nx/ny/nz が無い)。
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("logs", nargs="+", help="fem Kokkos の標準出力ファイル")
+    ap.add_argument("--binary", required=True,
+                    help="対応するバイナリの絶対パス (parse_logs.py が impl/variant を推論するのに使う)")
+    ap.add_argument("--nside", type=int, required=True, help="一辺の節点数 (65 → 65^3)")
+    ap.add_argument("--time-file", default=None, help="`/usr/bin/time -p` の出力 (real/user/sys)")
+    a = ap.parse_args()
 
-使い方:
-    # results/local/ 配下の全 .log/.csv を変換
-    python3 parse_logs.py --input ../results/local --output ../results/local/summary.csv
+    n = a.nside
+    NP, NPLU = n**3, nplu(n)
+    real = user = sysc = 0.0
+    if a.time_file and os.path.exists(a.time_file):
+        for line in open(a.time_file):
+            k, _, v = line.partition(" ")
+            if k in ("real", "user", "sys"):
+                v = float(v)
+                real, user, sysc = (v, user, sysc) if k == "real" else \
+                                   (real, v, sysc) if k == "user" else (real, user, v)
 
-    # 既存の fem.csv に追記
-    python3 parse_logs.py --input ../results/local --append fem.csv
+    print("# binary,NP,time_sec,performance_gflops,error,real_sec,user_sec,sys_sec,"
+          "num_time_steps_logged,last_sim_time")
+    for lg in a.logs:
+        r = parse(lg)
+        if r is None:
+            print(f"WARNING: {lg}: 解析できません", file=sys.stderr); continue
+        iters, resid, solver_s, mat_s = r
+        flop = iters * (NP*14 + NPLU*2) + NP*3 + NPLU*2
+        print("%s,%d,%13.6e,%13.6e,%13.6e,%13.6e,%13.6e,%13.6e,%d,%13.6e" %
+              (a.binary, NP, solver_s, flop/solver_s*1e-9, resid,
+               real, user, sysc, iters, mat_s))
 
-    # 個別ファイル指定
-    python3 parse_logs.py file1.log file2.log --output combined.csv
-"""
-import argparse
-import csv
-import math
-import os
-import re
-import sys
-from pathlib import Path
-from typing import List, Optional
-
-# fem.csv の 18 カラムスキーマ (nx/ny/nz は fem では mesh 固定で意味なしのため削除)
-COLS = [
-    "category", "machine", "mode", "language",
-    "impl", "variant", "memory_model",
-    "optimization_type", "optimization_param", "fp",
-    "N",
-    "time_sec", "performance_gflops", "error",
-    "real_sec", "user_sec", "sys_sec",
-    "source_file",
-]
-
-# バイナリパスから言語・impl・variant を抜き出す regex
-# 例: .../C++/openmp-target/auto.def/build-local-gpu/fem.gpu.32
-PATH_RE = re.compile(
-    r"/(?P<lang>C\+\+|F)/(?P<impl>[^/]+)(?:/(?P<variant>[^/]+(?:/[^/]+)?))?/build-(?P<machine>[^-]+)-(?P<mode>[^/]+)/(?P<binname>[^/]+)$"
-)
-# Kokkos は 4 階層 (kokkos/<policy>/<sub>) なので variant が "policy/sub" 形式
-BIN_RE = re.compile(
-    r"^(?P<target>\w+)\.(?P<mode>gpu|cpu|uni)\.(?P<fp>\d+)(?:\.(?P<nthr>\d+))?$"
-)
-
-
-def infer_meta(binary_path: str, log_file: Path) -> dict:
-    """バイナリパス + log ファイル位置から 11 カラムのメタ情報を推論。"""
-    meta = {c: "" for c in COLS}
-
-    # log ファイル所在の親ディレクトリから machine を補足推論 (results/<machine>/)
-    parts = log_file.resolve().parts
-    machine_from_log = ""
-    if "results" in parts:
-        idx = parts.index("results")
-        if idx + 1 < len(parts):
-            machine_from_log = parts[idx + 1]
-
-    # バイナリパスを正規化
-    path_str = binary_path.replace("\\", "/")
-
-    m = PATH_RE.search(path_str)
-    if m:
-        lang_dir = m.group("lang")
-        impl = m.group("impl")
-        variant_raw = m.group("variant") or ""
-        machine = m.group("machine")
-        mode_from_dir = m.group("mode")
-        binname = m.group("binname")
-
-        meta["language"] = "cpp" if lang_dir == "C++" else "f90"
-        meta["impl"] = impl
-        meta["variant"] = variant_raw
-        meta["machine"] = machine
-        meta["mode"] = mode_from_dir
-        meta["category"] = "Kokkos" if impl == "kokkos" else "non-Kokkos"
-    else:
-        binname = os.path.basename(path_str)
-        if machine_from_log:
-            meta["machine"] = machine_from_log
-
-    # バイナリ名から target/mode/fp/nthreads を取得
-    mb = BIN_RE.match(os.path.basename(binname))
-    if mb:
-        meta["mode"] = meta["mode"] or mb.group("mode")
-        meta["fp"] = mb.group("fp")
-        if mb.group("nthr"):
-            meta["optimization_param"] = f"NTHREADS={mb.group('nthr')}"
-            meta["optimization_type"] = "nthreads"
-
-    # variant 名から memory_model と optimization_type を推論
-    v = meta.get("variant", "")
-    if v.startswith("auto"):
-        meta["memory_model"] = "managed"
-    elif v.startswith("manu"):
-        meta["memory_model"] = "separate"
-    elif meta["mode"] == "uni":
-        meta["memory_model"] = "unified"
-    elif meta["impl"] == "openmp-cpu" or meta["mode"] == "cpu":
-        meta["memory_model"] = "cpu-only"
-
-    # Kokkos の memory model + optimization_type
-    if meta["impl"] == "kokkos":
-        if "uvm" in v:
-            meta["memory_model"] = "kokkos-uvm"
-        else:
-            meta["memory_model"] = "kokkos-default"
-        if "tile-sweep" in v:
-            meta["optimization_type"] = "tile-sweep"
-        elif "chunk-sweep" in v:
-            meta["optimization_type"] = "chunk-sweep"
-        elif "cpu-sweep" in v or "uvm-sweep" in v:
-            meta["optimization_type"] = "opt-level-sweep"
-        elif "fused" in v:
-            meta["optimization_type"] = "fused"
-        else:
-            meta["optimization_type"] = "baseline"
-    elif not meta.get("optimization_type"):
-        if v.endswith(".opt"):
-            meta["optimization_type"] = "nthreads"
-            if not meta["optimization_param"]:
-                meta["optimization_param"] = "NTHREADS=128"
-        else:
-            meta["optimization_type"] = "baseline"
-
-    return meta
-
-
-def parse_log_file(log_file: Path) -> List[dict]:
-    """1 つのログから 21 カラム形式の dict のリストを返す。"""
-    rows = []
-    with open(log_file) as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            fields = [x.strip() for x in line.split(",")]
-            if len(fields) < 10:
-                continue
-            binary_path = fields[0]
-            try:
-                N = int(fields[1])
-            except ValueError:
-                continue
-
-            meta = infer_meta(binary_path, log_file)
-            meta["N"] = N
-            meta["time_sec"] = fields[2]
-            meta["performance_gflops"] = fields[3]
-            meta["error"] = fields[4]
-            meta["real_sec"] = fields[5]
-            meta["user_sec"] = fields[6]
-            meta["sys_sec"] = fields[7]
-            # fields[8] = num_time_steps_logged, [9] = last_sim_time は fem.csv 21 カラムに含まれない
-            meta["source_file"] = str(log_file)
-            rows.append(meta)
-    return rows
-
-
-def collect_logs(paths: List[Path]) -> List[Path]:
-    """ディレクトリ or ファイルのリストから全 *.log / *.csv を集める。"""
-    out = []
-    for p in paths:
-        if p.is_dir():
-            out.extend(sorted(p.rglob("*.log")))
-            out.extend(sorted(p.rglob("*.csv")))
-        elif p.is_file():
-            out.append(p)
-    # .gitkeep 等は除外
-    return [f for f in out if f.suffix in (".log", ".csv") and f.stat().st_size > 0]
-
-
-def main() -> int:
-    ap = argparse.ArgumentParser(
-        description="results/<machine>/*.log を fem.csv 形式 (21 列) に集約変換")
-    ap.add_argument("inputs", nargs="*", help="入力ファイル or ディレクトリ")
-    ap.add_argument("--input", action="append", default=[],
-                    help="入力ディレクトリ (複数指定可)")
-    ap.add_argument("--output", default=None,
-                    help="出力 CSV パス (省略時は stdout)")
-    ap.add_argument("--append", default=None, metavar="EXISTING_CSV",
-                    help="既存 CSV (例: summary/fem.csv) に追記 (header はスキップ)")
-    args = ap.parse_args()
-
-    paths = [Path(p) for p in args.inputs + args.input]
-    if not paths:
-        ap.error("入力ファイル or --input ディレクトリを指定")
-
-    log_files = collect_logs(paths)
-    if not log_files:
-        print(f"WARNING: 入力に該当する *.log/*.csv が見つからない", file=sys.stderr)
-        return 1
-
-    all_rows = []
-    for lf in log_files:
-        rows = parse_log_file(lf)
-        all_rows.extend(rows)
-        print(f"  {lf}: {len(rows)} rows", file=sys.stderr)
-
-    print(f"合計 {len(all_rows)} 行抽出", file=sys.stderr)
-
-    # 出力
-    if args.append:
-        # 既存 CSV に追記 (header をスキップ)
-        with open(args.append, "a", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=COLS)
-            w.writerows(all_rows)
-        print(f"追記: {args.append}", file=sys.stderr)
-    else:
-        out = open(args.output, "w", newline="") if args.output else sys.stdout
-        w = csv.DictWriter(out, fieldnames=COLS)
-        w.writeheader()
-        w.writerows(all_rows)
-        if args.output:
-            out.close()
-            print(f"出力: {args.output}", file=sys.stderr)
-
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())
+main()

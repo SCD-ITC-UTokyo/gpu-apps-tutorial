@@ -4,6 +4,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <numeric>   // std::transform_reduce
+#include <iterator>  // std::begin, std::end
+#include <algorithm> // std::for_each_n
+#include <execution> // std::execution::par
+#include <boost/iterator/counting_iterator.hpp>
 #include "pfem_util.h"
 
 extern FILE *fp_log;
@@ -61,9 +66,9 @@ void  CG  (
   MAXIT  = ITER;
   TOL   = RESID;          
 
-#pragma acc parallel loop   \
-  private(i)
-  for(i=0;i<NP;i++){
+  std::for_each_n
+  ( std::execution::par, boost::iterators::counting_iterator<int32_t>(0), NP, [=](int i)
+  {
     X[i]=0.0;	
     //    WW[R][i]=0.0;
     //    WW[Z][i]=0.0;
@@ -75,15 +80,17 @@ void  CG  (
     QW[i]=0.0;
     PW[i]=0.0;
     DW[i]=0.0;
-  }
+  });
 /**
    +-----------------------+
    | {r0}= {b} - [A]{xini} |
    +-----------------------+
 **/
-#pragma acc parallel loop \
-  private(i,j,WVAL)
-  for(i=0;i<NP;i++){
+  std::for_each_n
+  ( std::execution::par, boost::iterators::counting_iterator<int32_t>(0), NP, [=](int i)
+  {
+    KREAL WVAL;
+    KINT  j;
     //    WW[DD][i]= 1.0/D[i];
     DW[i]= 1.0/D[i];
     WVAL= B[i] - D[i]*X[i];
@@ -93,14 +100,15 @@ void  CG  (
     }
     //    WW[R][i]= WVAL;
     RW[i]= WVAL;
-  }
+  });
   
   BNRM2= 0.e0;
-#pragma acc parallel loop \
-  private(i) reduction(+:BNRM2)
-  for(i=0;i<NP;i++){
-    BNRM2+= B[i]*B[i];
-  }
+  BNRM2 = std::transform_reduce
+  ( std::execution::par, boost::iterators::counting_iterator<int32_t>(0), boost::iterators::counting_iterator<int32_t>(NP), BNRM2, std::plus<KREAL>{},
+    [=](int i)
+  {
+    return B[i]*B[i];
+  });
   
   if (BNRM2 == 0.e0) BNRM2= 1.e0;
   
@@ -116,24 +124,24 @@ void  CG  (
    | {z}= [Minv]{r} |
    +----------------+
 **/
-#pragma acc parallel loop \
-  private(i)
-    for(i=0;i<NP;i++){
+    std::for_each_n
+    ( std::execution::par, boost::iterators::counting_iterator<int32_t>(0), NP, [=](int i)
+    {
       //      WW[Z][i]= WW[DD][i]*WW[R][i];
       ZW[i]= DW[i]*RW[i];
-    }
+    });
 /**
    +---------------+
    | {RHO}= {r}{z} |
    +---------------+
 **/
     RHO= 0.e0;
-#pragma acc parallel loop \
-  private(i) reduction(+:RHO)
-    for(i=0;i<NP;i++){
-      //      RHO+= WW[R][i]*WW[Z][i];
-      RHO+= RW[i]*ZW[i];
-    }
+    RHO = std::transform_reduce
+    ( std::execution::par, boost::iterators::counting_iterator<int32_t>(0), boost::iterators::counting_iterator<int32_t>(NP), RHO, std::plus<KREAL>{},
+      [=](int i)
+    {
+      return RW[i]*ZW[i];
+    });
 /**
    +-----------------------------+
    | {p} = {z} if      ITER=1    |
@@ -141,29 +149,31 @@ void  CG  (
    +-----------------------------+
 **/
     if( ITER == 1 ){
-#pragma acc parallel loop \
-  private(i)
-      for(i=0;i<NP;i++){
+      std::for_each_n
+      ( std::execution::par, boost::iterators::counting_iterator<int32_t>(0), NP, [=](int i)
+      {
 	//	WW[P][i]=WW[Z][i];
 	PW[i]=ZW[i];
-      }
+      });
     }else{
       BETA= RHO / RHO1;
-#pragma acc parallel loop \
-  private(i)
-      for(i=0;i<NP;i++){
+      std::for_each_n
+      ( std::execution::par, boost::iterators::counting_iterator<int32_t>(0), NP, [=](int i)
+      {
 	//	WW[P][i]=WW[Z][i] + BETA*WW[P][i];
 	PW[i]=ZW[i] + BETA*PW[i];
-      }
+      });
     }
 /**
    +-------------+
    | {q}= [A]{p} |
    +-------------+
 **/      
-#pragma acc parallel loop \
-  private(i,j,WVAL)
-    for( i=0;i<NP;i++){
+    std::for_each_n
+    ( std::execution::par, boost::iterators::counting_iterator<int32_t>(0), NP, [=](int i)
+    {
+      KREAL WVAL;
+      KINT  j;
       //      WVAL= D[i] * WW[P][i];
       WVAL= D[i] * PW[i];
       for(j=indexLU[i];j<indexLU[i+1];j++){
@@ -172,7 +182,7 @@ void  CG  (
       }
       //      WW[Q][i]=WVAL;
       QW[i]=WVAL;
-    }
+    });
 
 /**
    +---------------------+
@@ -180,12 +190,12 @@ void  CG  (
    +---------------------+
 **/
     C1= 0.e0;
-#pragma acc parallel loop \
-  private(i) reduction(+:C1)
-    for(i=0;i<NP;i++){
-      //      C1+=WW[P][i]*WW[Q][i];
-      C1+=PW[i]*QW[i];
-    }
+    C1 = std::transform_reduce
+    ( std::execution::par, boost::iterators::counting_iterator<int32_t>(0), boost::iterators::counting_iterator<int32_t>(NP), C1, std::plus<KREAL>{},
+      [=](int i)
+    {
+      return PW[i]*QW[i];
+    });
     ALPHA= RHO / C1;
 
 /**
@@ -194,22 +204,22 @@ void  CG  (
    | {r}= {r} - ALPHA*{q} |
    +----------------------+
 **/
-#pragma acc parallel loop \
-  private(i)
-    for(i=0;i<NP;i++){
+    std::for_each_n
+    ( std::execution::par, boost::iterators::counting_iterator<int32_t>(0), NP, [=](int i)
+    {
       //      X [i]   +=  ALPHA *WW[P][i];
       X [i]   +=  ALPHA *PW[i];
       //      WW[R][i]+= -ALPHA *WW[Q][i];
       RW[i]+= -ALPHA *QW[i];
-    }
+    });
   
     DNRM2= 0.e0;
-#pragma acc parallel loop \
-  private(i) reduction(+:DNRM2)
-    for(i=0;i<NP;i++){
-      //      DNRM2+=WW[R][i]*WW[R][i];
-      DNRM2+=RW[i]*RW[i];
-    }
+    DNRM2 = std::transform_reduce
+    ( std::execution::par, boost::iterators::counting_iterator<int32_t>(0), boost::iterators::counting_iterator<int32_t>(NP), DNRM2, std::plus<KREAL>{},
+      [=](int i)
+    {
+      return RW[i]*RW[i];
+    });
 #if   FP ==  32
     RESID= sqrtf(DNRM2/BNRM2);
 #elif FP ==  64

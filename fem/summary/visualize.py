@@ -52,7 +52,6 @@ for c in NUMERIC_COLS:
 df["variant_display"] = df["variant"].fillna("").replace("", "(no variant)")
 df["param_display"] = df["optimization_param"].fillna("").replace("", "(baseline)")
 
-print(f"  category    : {sorted(df['category'].dropna().unique())}")
 print(f"  machine     : {sorted(df['machine'].dropna().unique())}")
 print(f"  impl        : {sorted(df['impl'].dropna().unique())}")
 print(f"  opt_type    : {sorted(df['optimization_type'].dropna().unique())}")
@@ -63,18 +62,23 @@ print(f"  opt_type    : {sorted(df['optimization_type'].dropna().unique())}")
 # ============================================================
 AXIS_CHOICES = [c for c in NUMERIC_COLS if c in df.columns and df[c].notna().any()]
 
+# フィルタ軸から外した列 (いずれも他の軸から一意に決まり絞り込みの幅を増やさない):
+#   category          … impl と重複 (Kokkos / non-Kokkos は impl で判る)
+#   optimization_type … (impl, variant) から一意に決まる
+# CSV の列自体は互換性のため残し、色分け軸 (COLOR_CATS) にも残す
+# (baseline / tile-sweep 等でまとめて色を付けられると便利なため)。
 FILTER_CATS = [
     c for c in [
-        "category", "machine", "mode", "language",
+        "machine", "mode", "language",
         "impl", "variant_display", "memory_model",
-        "optimization_type", "param_display", "fp",
+        "param_display", "fp",
     ]
     if c in df.columns
 ]
 
 COLOR_CATS = [
     "impl", "variant_display", "memory_model", "optimization_type",
-    "category", "machine", "mode", "language", "fp", "param_display",
+    "machine", "mode", "language", "fp", "param_display",
 ]
 
 PALETTE = [
@@ -360,7 +364,7 @@ function hoverText(r) {{
         + (r['param_display'] && r['param_display'] !== '(baseline)' ? ` [${{r['param_display']}}]` : '')
         + `<br>machine=${{r['machine']}}/${{r['mode']}}  lang=${{r['language']}}  fp=${{r['fp']}}<br>`
         + `memory=${{r['memory_model']}}  opt=${{r['optimization_type']}}<br>`
-        + `N=${{r['N']}} (${{r['nx']}}×${{r['ny']}}×${{r['nz']}})<br>`
+        + `N=${{r['N']}} (NP: 節点数)<br>`
         + `time=${{fmt(r['time_sec'])}}s  perf=${{fmt(r['performance_gflops'])}} GFlop/s<br>`
         + `err=${{fmt(r['error'])}}`;
 }}

@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include "precision.h"
+#include "pfem_util.h"   /* FLOP / ITERactual のグローバル宣言 (precision.h も含む) */
 #include "allocate.h"
 extern FILE *fp_log;
 /***
@@ -38,7 +38,7 @@ void  CG  (
    | INIT. |
    +-------+
 **/
-  ERROR= 0;
+  *ERROR= 0;
   
   WW=(KREAL**) allocate_matrix(sizeof(KREAL),4,N);
   
@@ -184,4 +184,9 @@ void  CG  (
 ***/
 
   free(WW);
+
+  FLOP = (double)ITER*(N*14 + NPLU*2) + N*3 + NPLU*2;
+
+  /* グローバル ITERactual に実反復回数を保存 (CG パラメータの ITER はローカル shadow なので追加で必要) */
+  ITERactual = ITER;
 }

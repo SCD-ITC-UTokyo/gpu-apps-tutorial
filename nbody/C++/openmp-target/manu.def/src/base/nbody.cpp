@@ -16,9 +16,6 @@
 
 #include <unistd.h>
 
-#include <boost/filesystem.hpp>                // boost::filesystem
-#include <boost/math/constants/constants.hpp>  // boost::math::constants::two_pi
-#include <boost/program_options.hpp>           // boost::program_options
 #include <cmath>                               // std::fma
 #include <cstdint>                             // int32_t
 #include <iostream>                            // std::cout
@@ -30,7 +27,6 @@
 #include "common/init.hpp"
 #include "common/io.hpp"
 #include "common/type.hpp"
-#include "util/hdf5.hpp"
 #include "util/macro.hpp"
 #include "util/timer.hpp"
 
@@ -270,8 +266,6 @@ auto main([[maybe_unused]] const int32_t argc, [[maybe_unused]] const char *cons
 #ifdef CALCULATE_POTENTIAL
   const auto eps_inv = AS_FLT_ACC(1.0) / CAST2ACC(eps);
 #endif  // CALCULATE_POTENTIAL
-  util::hdf5::commit_datatype_vec3();
-  util::hdf5::commit_datatype_vec4();
 #endif  // BENCHMARK_MODE
 
 #ifdef BENCHMARK_MODE
@@ -293,7 +287,7 @@ auto main([[maybe_unused]] const int32_t argc, [[maybe_unused]] const char *cons
 #pragma omp target update to(pos[0:num], vel[0:num])
 
 #ifndef BENCHMARK_MODE
-    // write the first snapshot
+    // record the conservation errors at the initial snapshot time
     calc_acc(num, pos, acc, num, pos, eps2);
     trim_acc(num, acc
 #ifdef CALCULATE_POTENTIAL
@@ -303,7 +297,7 @@ auto main([[maybe_unused]] const int32_t argc, [[maybe_unused]] const char *cons
     );
     auto error = conservatives();
 #pragma omp target update from(pos[0:num], vel[0:num], acc[0:num])
-    io::write_snapshot(num, pos, vel, acc, file.c_str(), present, time, error);
+    error.record(num, pos, vel, acc);
 
     // half-step integration for velocity
     kick(num, vel, acc, AS_FP_M(0.5) * dt);
@@ -327,14 +321,14 @@ auto main([[maybe_unused]] const int32_t argc, [[maybe_unused]] const char *cons
       );
       kick(num, vel, acc, dt);
 
-      // write snapshot
+      // record the conservation errors at every snapshot time
       if (present > previous) {
         previous = present;
         time_from_snapshot = AS_FP_M(0.0);
         time += snapshot_interval;
         kick_backward_half(num, vel, acc, vel_tmp, dt);
 #pragma omp target update from(pos[0:num], vel[0:num], vel_tmp[0:num], acc[0:num])
-        io::write_snapshot(num, pos, vel_tmp, acc, file.c_str(), present, time, error);
+        error.record(num, pos, vel_tmp, acc);
       }
     }
 #else   // BENCHMARK_MODE
@@ -374,8 +368,6 @@ auto main([[maybe_unused]] const int32_t argc, [[maybe_unused]] const char *cons
 #ifdef BENCHMARK_MODE
   }
 #else  // BENCHMARK_MODE
-  util::hdf5::remove_datatype_vec3();
-  util::hdf5::remove_datatype_vec4();
 
   time_to_solution.stop();
   io::write_log(argv[0], time_to_solution.get_elapsed_wall(), step, num, file.c_str()

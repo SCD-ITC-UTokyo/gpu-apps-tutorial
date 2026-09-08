@@ -2,7 +2,9 @@
 name: nbody
 description: 3D direct N-body 重力多体問題 (2nd-order leapfrog 軌道積分)
 
-# バイナリ名: {target}.bench.{mode}.{FP_L}.{FP_M}  例: nbody.bench.gpu.32.32 (混合精度時は 32.64)
+# バイナリ名: {target}.{mode}.{FP_L}.{FP_M}[.{NTHREADS}]
+#   例: nbody.gpu.32.32 (単精度) / nbody.gpu.64.64 (倍精度) / nbody.gpu.32.64 (混合精度)
+#       nbody.gpu.32.32.256 (auto.opt/manu.opt で --nthreads 256 を指定した場合)
 target: nbody
 
 # ソース: nbody は 1 コンパイル単位 (base/nbody.cpp) で common/util の .hpp を include
@@ -12,10 +14,11 @@ sources:
     - base/nbody.cpp
   f90:
     - common/type_mod.f90
+    - util/timer_mod.f90
     - common/cfg_mod.f90
     - common/init_mod.f90
-    - common/io_mod.f90
     - common/conservatives_mod.f90
+    - common/io_mod.f90
     - base/nbody.f90
 
 # include paths (configure.py が CMake/Make の -I に追加)
@@ -32,19 +35,19 @@ headers:
     - common/init.hpp
     - common/io.hpp
     - common/type.hpp
-    - util/hdf5.hpp
     - util/macro.hpp
     - util/timer.hpp
     - util/type.hpp
 
-# 外部ライブラリ (Boost と HDF5 が必須、リンク順注意)
-libs:
-  - "-lboost_program_options"
-  - "-lboost_filesystem"
-  - "-lboost_system"
-  - "-lboost_timer"
-  - "-lboost_chrono"
-  - "-lhdf5"
+# 外部ライブラリ: 無し。
+# 以前は Boost 5 種と HDF5 をリンクしていたが、
+#   boost::program_options -> 自作パーサ (common/cfg.hpp)
+#   boost::timer           -> std::chrono + getrusage (util/timer.hpp)
+#   boost::filesystem      -> POSIX mkdir/stat (common/io.hpp)
+#   boost::iterators       -> util::counting_iterator (util/counting_iterator.hpp)
+#   HDF5                   -> スナップショット出力ごと廃止 (util/hdf5.hpp も削除)
+# に置き換え、diffusion / fem と同じく外部依存ゼロにした。
+libs: []
 
 # プリプロセッサ定義 (configure.py が -D で全て付与)
 # FP_L/FP_M はユーザ指定 (--fp が両方を上書き、または --fp-low/--fp-mid で個別)

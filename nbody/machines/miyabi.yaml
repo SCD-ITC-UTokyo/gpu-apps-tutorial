@@ -51,9 +51,9 @@ job:
   # 生成ジョブスクリプトの "環境設定" コメントブロックに推奨例として出力するのみ。
   # 実際の module load はユーザが手動で行う (ビルド env と一致させる責務)。
   per_mode:
-    gpu: { queue: debug-g, omp_threads: 72,  modules: ["nvidia/25.9", "hdf5/1.14.6"] }
-    uni: { queue: debug-g, omp_threads: 72,  modules: ["nvidia/25.9", "hdf5/1.14.6"] }
-    cpu: { queue: debug-c, omp_threads: 112, modules: ["intel", "hdf5/1.14.6"] }
+    gpu: { queue: debug-g, omp_threads: 72,  modules: ["nvidia/25.9"] }
+    uni: { queue: debug-g, omp_threads: 72,  modules: ["nvidia/25.9"] }
+    cpu: { queue: debug-c, omp_threads: 112, modules: ["intel"] }
   env:
     - "OMP_PROC_BIND=spread"
     - "OMP_PLACES=threads"

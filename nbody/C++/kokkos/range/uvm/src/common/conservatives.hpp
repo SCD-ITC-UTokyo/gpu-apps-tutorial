@@ -13,7 +13,6 @@
 #include <type_traits>  // std::remove_const_t
 
 #include "common/type.hpp"
-#include "util/hdf5.hpp"
 
 class conservatives {
  public:
@@ -23,79 +22,20 @@ class conservatives {
   conservatives() = default;
 
   ///
-  /// @brief record conservation errors
+  /// @brief record the conservation errors
+  ///
+  /// The snapshot output used to update the errors as a side effect; it was
+  /// removed together with the HDF5 output, so this is now the entry point
+  /// that keeps energy_error_worst / energy_error_final / virial_ratio_final
+  /// (reported by io::write_log) up to date.
   ///
   /// @param[in] num number of N-body particles
   /// @param[in] pos position of N-body particles
   /// @param[in] vel velocity of N-body particles
   /// @param[in] acc acceleration of N-body particles
-  /// @param[in] loc location or object identifier (group in most cases)
-  /// @param[in] grp_name name of the new sub-group
   ///
-  inline void write_hdf5(const type::int_idx num, const type::position *const pos, const type::velocity *const vel, const type::acceleration *const acc, const hid_t loc, const char *grp_name = "conservative") {
+  inline void record(const type::int_idx num, const type::position *const pos, const type::velocity *const vel, const type::acceleration *const acc) {
     calc(num, pos, vel, acc);
-
-    const auto grp = H5Gcreate(loc, grp_name, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    const auto d_spc = util::hdf5::setup_dataspace(static_cast<hsize_t>(1));
-
-    // write the conservatives
-    util::hdf5::write_type(grp, "fp_h", sizeof(type::fp_h), d_spc);
-
-    // write the worst error
-    auto subgrp = H5Gcreate(grp, "worst error", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-#ifdef CALCULATE_POTENTIAL
-    util::hdf5::write_attr(subgrp, "E_tot", &E_tot_worst, d_spc);
-#endif  // CALCULATE_POTENTIAL
-    util::hdf5::write_attr(subgrp, "px", &px_worst, d_spc);
-    util::hdf5::write_attr(subgrp, "py", &py_worst, d_spc);
-    util::hdf5::write_attr(subgrp, "pz", &pz_worst, d_spc);
-    util::hdf5::write_attr(subgrp, "Lx", &Lx_worst, d_spc);
-    util::hdf5::write_attr(subgrp, "Ly", &Ly_worst, d_spc);
-    util::hdf5::write_attr(subgrp, "Lz", &Lz_worst, d_spc);
-    util::hdf5::call(H5Gclose(subgrp));
-
-    // write the latest error
-    subgrp = H5Gcreate(grp, "latest error", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-#ifdef CALCULATE_POTENTIAL
-    util::hdf5::write_attr(subgrp, "E_tot", &E_tot_err, d_spc);
-#endif  // CALCULATE_POTENTIAL
-    util::hdf5::write_attr(subgrp, "px", &px_err, d_spc);
-    util::hdf5::write_attr(subgrp, "py", &py_err, d_spc);
-    util::hdf5::write_attr(subgrp, "pz", &pz_err, d_spc);
-    util::hdf5::write_attr(subgrp, "Lx", &Lx_err, d_spc);
-    util::hdf5::write_attr(subgrp, "Ly", &Ly_err, d_spc);
-    util::hdf5::write_attr(subgrp, "Lz", &Lz_err, d_spc);
-    util::hdf5::call(H5Gclose(subgrp));
-
-    // write the current conservatives
-    subgrp = H5Gcreate(grp, "current", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-#ifdef CALCULATE_POTENTIAL
-    util::hdf5::write_attr(subgrp, "E_tot", &E_tot, d_spc);
-    util::hdf5::write_attr(subgrp, "E_kin", &E_kin, d_spc);
-    util::hdf5::write_attr(subgrp, "E_pot", &E_pot, d_spc);
-    util::hdf5::write_attr(subgrp, "virial ratio", &virial, d_spc);
-#endif  // CALCULATE_POTENTIAL
-    util::hdf5::write_attr(subgrp, "px", &px, d_spc);
-    util::hdf5::write_attr(subgrp, "py", &py, d_spc);
-    util::hdf5::write_attr(subgrp, "pz", &pz, d_spc);
-    util::hdf5::write_attr(subgrp, "Lx", &Lx, d_spc);
-    util::hdf5::write_attr(subgrp, "Ly", &Ly, d_spc);
-    util::hdf5::write_attr(subgrp, "Lz", &Lz, d_spc);
-    util::hdf5::call(H5Gclose(subgrp));
-
-    // write the initial information
-    subgrp = H5Gcreate(grp, "initial", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    util::hdf5::write_attr(subgrp, "inv_E_tot", &inv_E_tot_ini, d_spc);
-    util::hdf5::write_attr(subgrp, "px", &px_ini, d_spc);
-    util::hdf5::write_attr(subgrp, "py", &py_ini, d_spc);
-    util::hdf5::write_attr(subgrp, "pz", &pz_ini, d_spc);
-    util::hdf5::write_attr(subgrp, "Lx", &Lx_ini, d_spc);
-    util::hdf5::write_attr(subgrp, "Ly", &Ly_ini, d_spc);
-    util::hdf5::write_attr(subgrp, "Lz", &Lz_ini, d_spc);
-    util::hdf5::call(H5Gclose(subgrp));
-
-    util::hdf5::close_dataspace(d_spc);
-    util::hdf5::call(H5Gclose(grp));
   }
 
   // accessors

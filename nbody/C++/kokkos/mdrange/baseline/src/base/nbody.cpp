@@ -10,9 +10,6 @@
 
 #include <unistd.h>
 
-#include <boost/filesystem.hpp>                // boost::filesystem
-#include <boost/math/constants/constants.hpp>  // boost::math::constants::two_pi
-#include <boost/program_options.hpp>           // boost::program_options
 #include <cmath>                               // std::fma
 #include <cstdint>                             // int32_t
 #include <iostream>                            // std::cout
@@ -29,7 +26,6 @@
 #include "common/init.hpp"
 #include "common/io.hpp"
 #include "common/type.hpp"
-#include "util/hdf5.hpp"
 #include "util/macro.hpp"
 #include "util/timer.hpp"
 
@@ -272,8 +268,6 @@ int main(int argc, char** argv) {
 #ifdef CALCULATE_POTENTIAL
   const auto eps_inv = AS_FLT_ACC(1.0) / CAST2ACC(eps);
 #endif  // CALCULATE_POTENTIAL
-  util::hdf5::commit_datatype_vec3();
-  util::hdf5::commit_datatype_vec4();
 #endif  // BENCHMARK_MODE
 
 #ifdef BENCHMARK_MODE
@@ -311,7 +305,7 @@ int main(int argc, char** argv) {
     Kokkos::deep_copy(pos, pos_h);
     Kokkos::deep_copy(vel, vel_h);
 #ifndef BENCHMARK_MODE
-    // write the first snapshot
+    // record the conservation errors at the initial snapshot time
     calc_acc(num, pos, acc, num, pos, eps2);
     trim_acc(num, acc
 #ifdef CALCULATE_POTENTIAL
@@ -324,7 +318,7 @@ int main(int argc, char** argv) {
     Kokkos::deep_copy(pos_h, pos);
     Kokkos::deep_copy(vel_h, vel);
     Kokkos::deep_copy(acc_h, acc);
-    io::write_snapshot(num, pos_h.data(), vel_h.data(), acc_h.data(), file.c_str(), present, time, error);
+    error.record(num, pos_h.data(), vel_h.data(), acc_h.data());
 
     // half-step integration for velocity
     kick(num, vel, acc, AS_FP_M(0.5) * dt);
@@ -348,7 +342,7 @@ int main(int argc, char** argv) {
       );
       kick(num, vel, acc, dt);
 
-      // write snapshot
+      // record the conservation errors at every snapshot time
       if (present > previous) {
         previous = present;
         time_from_snapshot = AS_FP_M(0.0);
@@ -358,7 +352,7 @@ int main(int argc, char** argv) {
         Kokkos::deep_copy(pos_h, pos);
         Kokkos::deep_copy(vel_tmp_h, vel_tmp);
         Kokkos::deep_copy(acc_h, acc);
-        io::write_snapshot(num, pos_h.data(), vel_tmp_h.data(), acc_h.data(), file.c_str(), present, time, error);
+        error.record(num, pos_h.data(), vel_tmp_h.data(), acc_h.data());
       }
     }
 #else   // BENCHMARK_MODE
@@ -397,8 +391,6 @@ int main(int argc, char** argv) {
 #ifdef BENCHMARK_MODE
   }
 #else  // BENCHMARK_MODE
-  util::hdf5::remove_datatype_vec3();
-  util::hdf5::remove_datatype_vec4();
 
   time_to_solution.stop();
   io::write_log(argv[0], time_to_solution.get_elapsed_wall(), step, num, file.c_str()

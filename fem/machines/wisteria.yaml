@@ -30,7 +30,9 @@ cpu:
 
 gpu:
   # Wisteria は NVHPC 24.1 系のため、古い -gpu=managed 文法を使用
-  common_flags: ["-tp=native", "-O3", "-I.", "-Wall", "-Minfo=accel,opt,mp"]
+  # Aquarius = A100 (cc80)。stdpar は cc を明示しないと
+  # std::execution::par が cc<70 向けコード生成となり逐次実行に退化する。
+  common_flags: ["-tp=native", "-gpu=cc80", "-O3", "-I.", "-Wall", "-Minfo=accel,opt,mp"]
   compiler:
     cc:  { cmd: nvc,       flags: [] }
     cxx: { cmd: nvc++,     flags: [-std=c++17] }

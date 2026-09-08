@@ -10,7 +10,13 @@
 #ifndef UTIL_TIMER_HPP
 #define UTIL_TIMER_HPP
 
-#include <boost/timer/timer.hpp>  // boost::timer::cpu_timer
+// boost::timer::cpu_timer から標準機能へ置き換え。
+//   wall clock : std::chrono::steady_clock (cpu_timer の .wall と等価)
+//   user CPU   : getrusage(RUSAGE_SELF) (cpu_timer の .user と等価)
+// diffusion / fem も getrusage を使っており、3 アプリで計測方法が揃う。
+#include <sys/resource.h>  // getrusage
+
+#include <chrono>  // std::chrono::steady_clock
 
 ///
 /// @brief utility tools
@@ -48,16 +54,17 @@ class timer {
   /// @brief start simple measurement
   ///
   inline void start() noexcept(true) {
-    elapsed.start();
+    wall_start = std::chrono::steady_clock::now();
+    user_start = get_user_time();
   }
 
   ///
   /// @brief stop simple measurement
   ///
   inline void stop() noexcept(true) {
-    elapsed.stop();
-    elapsed_wall += static_cast<double>(elapsed.elapsed().wall) * 1.0e-9;
-    elapsed_user += static_cast<double>(elapsed.elapsed().user) * 1.0e-9;
+    const auto wall_stop = std::chrono::steady_clock::now();
+    elapsed_wall += std::chrono::duration<double>(wall_stop - wall_start).count();
+    elapsed_user += get_user_time() - user_start;
   }
 
   ///
@@ -69,9 +76,19 @@ class timer {
   }
 
  private:
-  boost::timer::cpu_timer elapsed;  // stopwatch of the simulation to measure the elapsed time
-  double elapsed_wall = 0.0;        // elapsed time as wall clock time
-  double elapsed_user = 0.0;        // elapsed time as user CPU time
+  ///
+  /// @brief user CPU time of this process in seconds
+  ///
+  static inline double get_user_time() noexcept(true) {
+    struct rusage usage {};
+    getrusage(RUSAGE_SELF, &usage);
+    return (static_cast<double>(usage.ru_utime.tv_sec) + static_cast<double>(usage.ru_utime.tv_usec) * 1.0e-6);
+  }
+
+  std::chrono::steady_clock::time_point wall_start{};  // beginning of the current measurement
+  double user_start = 0.0;                             // user CPU time at the beginning of the current measurement
+  double elapsed_wall = 0.0;                           // elapsed time as wall clock time
+  double elapsed_user = 0.0;                           // elapsed time as user CPU time
 };
 }  // namespace util
 
