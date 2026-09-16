@@ -29,6 +29,10 @@ Dirichlet 境界条件、精度は FP32 / FP64 切替可。
 
 ---
 
+各アプリの README と build-tutorial.html は現在の実装の説明に徹しています。
+元コードからの変更点・計測データの由来・既知のデータ品質の問題は
+[HISTORY.md](HISTORY.md) を参照してください。
+
 ## 各アプリの詳細・使い方・性能評価
 
 クイックスタートや使い方/ビルド手順、ディレクトリ構造はアプリごとの README 及び build-tutorial.html をご覧ください。

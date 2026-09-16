@@ -49,6 +49,9 @@ job:
   submit_cmd: pjsub
   status_cmd: pjstat
   default_group: xxx
+  # default_group が placeholder のときの課金グループ自動検出パターン (fnmatch)。
+  # `id -Gn` の所属グループを上から順に照合し、最初に一致したものを採用する。
+  group_patterns: ["g[a-z][0-9]*", "jh[0-9]*"]
   default_walltime: "00:10:00"
   # mode → リソースグループ (Aquarius=GPU node、Odyssey=A64FX CPU node)
   # modules はジョブスクリプト生成時に「推奨例」コメントとして出るのみ。自動 load されない。
@@ -61,5 +64,11 @@ job:
     - "OMP_PLACES=threads"
 
 kokkos:
-  root: /xxx/kokkos/5.0.2/
+  # 要記入: 実機の Kokkos install 先 (KokkosConfig.cmake を含む prefix)。
+  # 未記入なら configure.py が環境変数 Kokkos_ROOT や ~/kokkos/* 等から自動検出し、
+  # それも失敗したら --kokkos-root での明示指定を促す。
+  # 注意: cxx_standard は Kokkos 本体の要求と揃える必要がある。
+  #       Kokkos 4.x = C++17、Kokkos 5.x = C++20 必須 (5.x を使うなら 20 に変更)。
+  #       Miyabi (GH200) では 4.7.02 を CUDA(sm_90)+OpenMP backend でビルドして動作確認済み。
+  root: /xxx/kokkos/4.7.02/
   cxx_standard: 17

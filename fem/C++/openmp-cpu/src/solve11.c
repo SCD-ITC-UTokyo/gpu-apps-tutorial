@@ -29,6 +29,8 @@ void SOLVE11()
    +------------------+
 **/
   CG (N,NPLU, D, AMAT, indexLU, itemLU, B, X, RESID, ITER, &ERROR);
-  ITERactual= ITER;
+  /* ITERactual / RESIDactual は CG が実反復回数・到達残差を入れて返す。
+     ここで ITERactual= ITER (= 最大反復数の設定値) を代入すると上書きして
+     しまうため行わない。 */
 }
 

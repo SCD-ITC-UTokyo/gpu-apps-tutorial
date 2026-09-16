@@ -264,6 +264,8 @@ void  CG  (
 
   FLOP = (double)ITER*(NP*14 + NPLU*2) + NP*3 + NPLU*2;
 
-  /* グローバル ITERactual に実反復回数を保存 (CG パラメータの ITER はローカル shadow なので追加で必要) */
-  ITERactual = ITER;
+  /* 引数の ITER / RESID はグローバルを shadow しているので、実反復回数と
+     到達残差を別名のグローバルに保存して test1 から参照できるようにする。 */
+  ITERactual  = ITER;
+  RESIDactual = RESID;
 }

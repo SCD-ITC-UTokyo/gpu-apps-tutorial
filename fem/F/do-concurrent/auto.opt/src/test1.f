@@ -5,6 +5,7 @@
       implicit none
 
       character(len=1024) :: arg
+      integer(kind=kint) :: nxn
 #ifndef BENCHMARK_MODE
       integer(kind=kint) :: i
 #endif
@@ -16,18 +17,21 @@
 
       if( command_argument_count() < 1 ) then
          call get_command_argument(0,arg)
-         write(*,'("Usage is: ",a," INPUT.DAT")') trim(arg)
+         write(*,'("Usage is: ",a," N [ITER] [COND] [QVOL] [RESID]")')
+     &        trim(arg)
+         write(*,'("  N: number of nodes per edge (cubic)")')
          stop
       end if
 
       call get_command_argument(1,arg)
+      read (arg,*) nxn
 !C
 !C +-------+
 !C | INIT. |
 !C +-------+
 !C===
-      call INPUT_CNTL( arg )
-      call INPUT_GRID
+      call INPUT_CNTL
+      call INPUT_GRID (nxn)
 !C===
 
 !C

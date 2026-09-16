@@ -87,7 +87,9 @@ void  CG  (
    | {z}= [Minv]{r} |
    +----------------+
 **/
-#pragma omp parallel private(i,j,k,WVAL)
+/* ALPHA / BETA は領域内で全スレッドが同じ値を書くだけなので private にする
+   (共有のままだと同時書き込みになり、規格上はデータ競合)。 */
+#pragma omp parallel private(i,j,k,WVAL,ALPHA,BETA)
 {
 #pragma omp for  
   for(i=0;i<N;i++){
@@ -98,6 +100,7 @@ void  CG  (
    | {RHO}= {r}{z} |
    +---------------+
 **/
+#pragma omp single
   RHO= 0.e0;
 #pragma omp for reduction(+:RHO)  
   for(i=0;i<N;i++){
@@ -141,6 +144,7 @@ void  CG  (
    | ALPHA= RHO / {p}{q} |
    +---------------------+
 **/
+#pragma omp single
   C1= 0.e0;
 #pragma omp for reduction(+:C1)  
   for(i=0;i<N;i++){
@@ -161,6 +165,7 @@ void  CG  (
     WW[R][i]+= -ALPHA *WW[Q][i];
   }
   
+#pragma omp single
   DNRM2= 0.e0;
 #pragma omp for reduction(+:DNRM2)  
   for(i=0;i<N;i++){
@@ -187,6 +192,8 @@ void  CG  (
 
   FLOP = (double)ITER*(N*14 + NPLU*2) + N*3 + NPLU*2;
 
-  /* グローバル ITERactual に実反復回数を保存 (CG パラメータの ITER はローカル shadow なので追加で必要) */
-  ITERactual = ITER;
+  /* 引数の ITER / RESID はグローバルを shadow しているので、実反復回数と
+     到達残差を別名のグローバルに保存して test1 から参照できるようにする。 */
+  ITERactual  = ITER;
+  RESIDactual = RESID;
 }

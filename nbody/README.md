@@ -88,10 +88,10 @@ cmake --build build-local-gpu
 | オプション | 既定の挙動 |
 |---|---|
 | `--queue NAME` | 省略時は machine yaml の `job.per_mode.<mode>.queue`。講習会などで専用キューを使うときに指定します (例: `--queue tutorial-g`)。使えるキュー名は `--info --machine <name>` で一覧できます |
-| `--group NAME` | 省略時は `id -gn` で課金グループを自動取得。取得できない場合はジョブスクリプト先頭に警告を出し、投入前の編集を促します |
+| `--group NAME` | 省略時は machine yaml の `job.group_patterns` と `id -Gn` / `id -gn` で課金グループを自動取得。取得できない場合はジョブスクリプト先頭に警告を出し、投入前の編集を促します |
 | `--kokkos-root PATH` | 省略時は **machine yaml の `kokkos.root`** を使い、それが placeholder (`/xxx/` 等) のときだけ自動検出に回ります。自動検出は環境変数 `Kokkos_ROOT` / `KOKKOS_ROOT` → `CMAKE_PREFIX_PATH` → `~/kokkos/*`, `~/.local`, `/opt/kokkos*`, `/usr/local`, spack の順に探索し、`KokkosConfig.cmake` を持つ prefix を採用します。どれも見つからない場合は指定を促して終了します |
 
-`--group` は明示値が `id -gn` の検出値と異なる場合に警告を出したうえで、指定値を優先します。
+`--group` は明示値が自動検出値と異なる場合に警告を出したうえで、指定値を優先します。
 `--kokkos-root` は明示値に `KokkosConfig.cmake` が無いときに警告を出し、そのまま指定値を使います
 (machine yaml の `kokkos.root` に `KokkosConfig.cmake` が無い場合は、自動検出値へフォールバックして警告します)。
 
@@ -285,19 +285,8 @@ nbody は 3 種類の浮動小数精度を使い分けます (define で制御):
 - `<variant>` (非 Kokkos) = `auto.def` / `auto.opt` / `manu.def` / `manu.opt`
 - `<policy>/<sub>` (Kokkos) = `{range,mdrange,team}/{baseline, cpu-sweep/tile/chunk, uvm, uvm-...}` (sub 名は policy 別)
 
-旧 nbody の `A1-F4` 表記は次のように対応:
-
-| 旧 ID | 新 (non-Kokkos) | 新 (Kokkos) |
-|---|---|---|
-| A1 | `C++/openacc/auto.def` | `C++/kokkos/range/baseline` |
-| A2 | `C++/openacc/auto.opt` | `C++/kokkos/range/cpu-sweep` |
-| A3 | `C++/openacc/manu.def` | `C++/kokkos/range/uvm` |
-| A4 | `C++/openacc/manu.opt` | `C++/kokkos/range/uvm-sweep` |
-| B1-B4 | `C++/openmp-target/{auto.def, auto.opt, manu.def, manu.opt}` | `C++/kokkos/mdrange/{baseline, cpu-tile-sweep, uvm, uvm-tile-sweep}` |
-| C1-C4 | `C++/stdpar/{auto.def, auto.opt}` (2 only) | `C++/kokkos/team/{baseline, cpu-chunk-sweep, uvm, uvm-chunk-sweep}` |
-| D1-D4 | `F/openacc/{auto.def, auto.opt, manu.def, manu.opt}` | — |
-| E1-E4 | `F/openmp-target/{auto.def, ...}` | — |
-| F1-F2 | `F/do-concurrent/{auto.def, auto.opt}` | — |
+計測データの `source_file` 列に現れる旧 ID (`A1`〜`F4`) との対応は
+[../HISTORY.md](../HISTORY.md) を参照してください。
 
 ---
 
@@ -320,10 +309,8 @@ nbody は 3 種類の浮動小数精度を使い分けます (define で制御):
 
 ## Fortran 版は Fortran だけで完結します
 
-以前の nbody の Fortran 版は、物理計算の本体が C++ にあり、Fortran は
-`iso_c_binding` を通じて呼び出すだけの混成ビルドでした
-(C++ 6 本 + Fortran 7 本のオブジェクトをリンク)。diffusion と fem の Fortran 実装は
-Fortran だけで閉じているため、nbody も揃えて C++ 側の実装を Fortran に移しました。
+Fortran 実装は物理計算の本体まで Fortran で書かれており、C++ とのリンクは不要です
+(diffusion・fem の Fortran 実装と同じ構成)。
 
 | モジュール | 内容 |
 |---|---|
@@ -337,45 +324,23 @@ Fortran だけで閉じているため、nbody も揃えて C++ 側の実装を 
 C++ 版と違って初期条件が実行ごとに変わりません
 (BENCHMARK_MODE が測るのは O(N^2) の力計算時間なので、測定結果には影響しません)。
 
-## 外部ライブラリ依存を廃止しました
+## 外部ライブラリ依存はありません
 
-以前は Boost (program_options / filesystem / system / timer / chrono) と HDF5 が必須でしたが、
-diffusion・fem と揃えて**外部ライブラリ依存をゼロ**にしました。置き換えは次のとおりです。
+ビルドに必要なのはコンパイラ (NVHPC / GCC / Intel) と CMake だけです。
+Boost や HDF5 といった外部ライブラリは使いません。
 
-| 旧 | 新 |
+| 用途 | 使っているもの |
 |---|---|
-| `boost::program_options` | 自作の引数パーサ (`common/cfg.hpp`) |
-| `boost::timer::cpu_timer` | `std::chrono::steady_clock` と `getrusage` (`util/timer.hpp`) |
-| `boost::filesystem` | POSIX の `mkdir` / `stat` (`common/io.hpp`) |
-| `boost::iterators::counting_iterator` | `util::counting_iterator` (`util/counting_iterator.hpp`、stdpar 用) |
-| `boost::math::constants::two_pi` | `2.0 * M_PI` |
-| HDF5 | スナップショット出力ごと削除 (`util/hdf5.hpp` も廃止)。ベンチマーク実行では元々未使用 |
+| 引数パース | 自作の引数パーサ (`common/cfg.hpp`) |
+| 時間計測 | `std::chrono::steady_clock` と `getrusage` (`util/timer.hpp`) |
+| ディレクトリ操作 | POSIX の `mkdir` / `stat` (`common/io.hpp`) |
+| stdpar 用イテレータ | `util::counting_iterator` (`util/counting_iterator.hpp`) |
 
-計測値は変わりません。`cpu_timer` の wall clock は `steady_clock` と、user CPU 時間は
-`getrusage` の `ru_utime` と同じものです。むしろ diffusion・fem が既に `getrusage` を
-使っているため、3 アプリで計測方法が揃いました。
+計測方法は diffusion・fem と同じです (wall clock は `steady_clock`、
+user / sys CPU 時間は `getrusage`)。出力は `log/<file>_run.csv` への追記のみで、
+スナップショット出力はありません。
 
-HDF5 によるスナップショット出力 (旧 `dat/*.h5` と `*.xdmf`) は **コードごと削除しました**。
-`BENCHMARK_MODE` を定義しないビルドでのみ有効な経路で、`configure.py` は常に
-`BENCHMARK_MODE` を付けるため本教材のビルドでは元から一度も実行されておらず、
-HDF5 ヘッダが無い環境ではそもそもビルドできませんでした。削除した内容は次のとおりです。
-
-| 削除したもの | 場所 |
-|---|---|
-| `io::write_snapshot()` と出力先 `folder_dat` (`dat/`) | 各 `src/common/io.hpp` |
-| `conservatives::write_hdf5()` | 各 `src/common/conservatives.hpp` |
-| HDF5 ラッパ `util/hdf5.hpp` (ファイル自体) | 各 `src/util/` |
-| `util::hdf5::{commit,remove}_datatype_vec3/vec4()` と呼び出し | 各 `src/base/nbody.cpp` |
-| 定義済みでない `io_write_snapshot` への呼び出し | 各 `src/base/nbody.f90` |
-
-保存量誤差の計算は `write_hdf5()` の内部で行われていたため、`conservatives::record()`
-として公開し直し、スナップショット時刻ごとに呼ぶようにしました。これにより
-`log/<file>_run.csv` の `energy_error_worst` / `energy_error_final` /
-`virial_ratio_final` は従来どおり記録されます。副作用として、`BENCHMARK_MODE` を
-外したシミュレーション実行 (C++ / Fortran とも) がビルドできるようになりました。
-
-ログ出力 (`log/<file>_run.csv`) は従来どおりです。出力先ディレクトリが無い場合に
-黙って失敗していた問題も、`mkdir` を入れて解消しました。
+---
 
 ## machines yaml の特徴
 
@@ -406,6 +371,67 @@ cmake -B build-local-gpu -S . -DFP_L=32 -DFP_M=64
 
 将来的に configure.py に `--fp-low` / `--fp-mid` オプションを追加予定。
 
+### 主要オプション
+
+diffusion / fem と共通です (値の意味だけ nbody 向けに補足):
+
+| 引数 | 必須 | 値 | 説明 |
+|---|---|---|---|
+| `--variant` | yes | `C++/openacc/auto.def` 等 | ビルドする variant のパス |
+| `--machine` | yes | `local` / `miyabi` / `wisteria` | 対象マシン |
+| `--mode` | yes | `gpu` / `cpu` / `uni` | GPU offload / CPU OpenMP / GPU unified memory |
+| `--compiler` | no | `intel` / `gcc` / `fccpx` / `frtpx` / `nvhpc` | CPU compiler 上書き |
+| `--build` | no | `cmake` (default) / `make` | ビルドシステム (Kokkos は cmake 強制) |
+| `--fp` | no | `32` / `64` | **FP_L と FP_M を一括指定** (混合精度は `cmake -DFP_L=32 -DFP_M=64`) |
+| `--nthreads` | no | int | NTHREADS デフォルト (opt variant のみ実効) |
+| `--tile-nx/ny/nz` | no | int | Kokkos mdrange tile-sweep の `_NX/_NY/_NZ` |
+| `--chunk` | no | int | Kokkos team chunk-sweep の `_CHUNK` |
+| `--opt-level` | no | `O0`〜`O4` / `fast` | ベース最適化レベルの上書き |
+| `--extra-cflags` | no | str | 追加 compile flag |
+| `--kokkos-root` | no | str | Kokkos の install prefix (kokkos variant のみ実効) |
+| `--exercise` / `--exercise-reset` / `--exercise-from` | no | flag / str | 演習用 variant の作成・再作成・コピー元指定 |
+| `--queue` | no | str | 投入キュー (PBS `-q` / PJM `-L rscgrp`) の明示指定 |
+| `--group` | no | str | 課金グループ (PBS `group_list` / PJM `-g`) の明示指定 |
+| `--dry-run` / `--dry-job` | no | flag | 生成内容を表示するだけで書き込まない |
+| `--clean` | no | flag | 生成物を削除 (実行結果と `results/` は残す) |
+| `--allclean` | no | flag | `--clean` に加えて実行結果 (`log/`) も削除 (`results/` は残す) |
+| `--yes`, `-y` | no | flag | `--clean` / `--allclean` の確認プロンプトを省略 (非対話環境では必須) |
+
+---
+
+## impl と mode の対応
+
+`--mode` は実装ごとに使える値が決まっており、`configure.py` は対応しない組み合わせを
+ERROR で拒否します。これは教材としての役割分担を反映したものです。
+
+| impl | 使える mode | 役割 |
+|---|---|---|
+| `openmp-cpu` | `cpu` | **CPU ベースライン**。GPU 版と比較する基準 |
+| `openmp-target` / `openacc` | `gpu` / `uni` | ディレクティブで GPU 化する手段 |
+| `stdpar` / `do-concurrent` | `gpu` / `uni` | 言語標準で GPU 化する手段 |
+| `kokkos` | `gpu` / `cpu` | **同一ソースが CPU でも GPU でも動く** portability の実演 |
+
+`openmp-target` / `openacc` / `stdpar` / `do-concurrent` に `cpu` モードが無いのは、
+これらが **GPU 化のための記述方法**であり、CPU 実行の比較対象は `openmp-cpu` に
+一本化しているためです。`kokkos` だけ `cpu` を持つのは、backend を差し替えるだけで
+同じコードが CPU でも動くこと自体が Kokkos の主題だからです。
+
+`uni` (unified memory) は `gpu` の派生で、Miyabi のみ利用できます
+(NVHPC 24.1 の Wisteria は `mem:unified` 非対応)。
+
+---
+
+## マシン × compiler の対応表
+
+| machine | default compiler | 使用可能 compiler | GPU compiler | サポート mode |
+|---|---|---|---|---|
+| `local` | gcc | gcc, nvhpc | nvhpc (auto-detect) | gpu, cpu, uni |
+| `miyabi` | intel | intel, gcc | nvhpc 24.5+ (GH200) | gpu, cpu, uni |
+| `wisteria` | gcc | gcc, fccpx (C/C++), frtpx (Fortran) | nvhpc 24.1 (A100) | gpu, cpu |
+
+`uni` (unified memory) は GPU mode の派生。NVHPC 24.1 では未対応のため Wisteria では使えない。
+Kokkos は machine yaml に `kokkos.root` (インストール先パス) と `cxx_standard` を要設定。
+
 ---
 
 ## エラー時の挙動
@@ -431,9 +457,36 @@ python3 visualize.py
   `optimization_param` / `fp` の 8 軸 (`category` と `optimization_type` は他の軸から一意に決まるため
   フィルタからは外し、色分け軸としてのみ残しています)
 
+### 既測データの概要
+
+| 項目 | 値 |
+|---|---|
+| 統合 CSV | `summary/nbody.csv` (行数は計測を追記するたびに増えます) |
+| 非 Kokkos 行 | 3588 (Miyabi / Wisteria 実機計測) |
+| Kokkos 行 | 4200 |
+| 粒子数 N | 1024 〜 4194304 を対数刻み (13 点) |
+| machine | miyabi, wisteria。CPU ベースライン (`openmp-cpu`) は Miyabi のみ、Miyabi-G (Grace) と Miyabi-C (Intel) の両方で計測 |
+| 精度 | 32 (FP_L=FP_M=32) / 64 (FP_L=FP_M=64) / 32_64 (FP_L=32, FP_M=64) の 3 通り |
+| impl 種類 | openmp-cpu, openmp-target, openacc, stdpar, do-concurrent, kokkos (6 種) |
+
+### ダッシュボードの典型的な使い方
+
+| 観察したいこと | 操作 |
+|---|---|
+| 「全 impl の性能スケーリング (N→GFLOPS)」 | X=N (log), Y=performance_gflops (log), 色=impl |
+| 「Miyabi と Wisteria の比較」 | filter=impl:kokkos + variant:range/baseline、X=N (log)、Y=performance_gflops、色=machine |
+| 「混合精度の効果」 | X=N (log)、Y=performance_gflops (log)、色=fp |
+| 「混合精度のエネルギー保存への影響」 | X=N (log)、Y=energy_error_final (log)、色=fp |
+| 「UVM のオーバーヘッド」 | filter=impl:kokkos、X=N、Y=performance_gflops、色=memory_model |
+
 ---
 
 ## 詳しく知りたい人向け
+
+このドキュメントは **現在の実装がどうなっているか** だけを説明しています。
+元コードからの変更点、計測データの由来、既知のデータ品質の問題は
+[../HISTORY.md](../HISTORY.md) にまとめてあります。
+
 
 - diffusion (`diffusion/README.md`) / fem (`fem/README.md`) と相補的。3 アプリで GPU プログラミングモデルの memory-bound / compute-bound / mixed 特性を一通り体験できる
 - nbody の元コード: `hairdesc_nbody_cpp/`, `hairdesc_nbody_f90/`, `hairdesc_nbody_kokkos/` (リポジトリ親階層)

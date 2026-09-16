@@ -1,75 +1,96 @@
 /**
  ** INPUT_GRID
+ **
+ ** 1 辺 nxn 節点の立方体メッシュ (8 節点六面体 1 次要素) を内部生成する。
+ ** 旧版はメッシュファイル cube.0 を読んでいたが、格子が完全に規則的で
+ ** nxn 一つから決まるため、diffusion / nbody と同様にファイル不要にした。
+ ** 生成されるデータは旧 cube.0 (nxn=65) と完全に同一。
+ **
+ **   節点番号 (1 origin): in = 1 + i + j*nxn + k*nxn*nxn   (x が最内)
+ **   節点座標            : (i, j, k)  格子間隔 1.0
+ **   要素結合            : 下面 4 節点 (反時計回り) → 上面 4 節点
+ **   節点グループ        : Xmin(i=0) / Ymin(j=0) / Zmin(k=0) / Zmax(k=nxn-1)
+ **                         MAT_ASS_BC が使うのは Zmax のみ
  **/
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "pfem_util.h"
 #include "allocate.h"
-void INPUT_GRID()
+void INPUT_GRID(int nxn)
 {
-  FILE *fp;
-  int i,j,k,ii,kk,nn,icel,iS,iE;
-  int NTYPE,IMAT;
-  
-  if( (fp=fopen(fname,"r")) == NULL){
-    fprintf(stdout,"input file cannot be opened!\n");
+  int i,j,k,icel,ib,n0;
+  int nxe, nn;
+
+  if( nxn < 2 ){
+    fprintf(stdout,"N must be 2 or larger (given: %d)\n", nxn);
     exit(1);
   }
+  nxe= nxn - 1;      /* 1 辺あたりの要素数 */
+  nn = nxn * nxn;    /* z 方向の節点ストライド */
 /**
    NODE
 **/
-  fscanf(fp,"%d",&N);
-  
+  N = nxn * nxn * nxn;
+
   NP=N;
   XYZ_g=View2D<KREAL>("XYZ",N,3); //device
-  
-  for(i=0;i<N;i++){
-    for(j=0;j<3;j++){
-      XYZ_g(i,j)=0.0;
+
+  for(k=0;k<nxn;k++){
+    for(j=0;j<nxn;j++){
+      for(i=0;i<nxn;i++){
+        n0= i + j*nxn + k*nn;
+        XYZ_g(n0,0)=(KREAL)i;
+        XYZ_g(n0,1)=(KREAL)j;
+        XYZ_g(n0,2)=(KREAL)k;
+      }
     }
-  }
-  
-  for(i=0;i<N;i++){
-    fscanf(fp,"%d %lf %lf %lf",&ii,&XYZ_g(i,0),&XYZ_g(i,1),&XYZ_g(i,2));
   }
 
 /**
    ELEMENT
 **/
-  fscanf(fp,"%d",&ICELTOT);
+  ICELTOT= nxe * nxe * nxe;
 
   ICELNOD_g=View2D<KINT>("ICELNOD",ICELTOT,8); //device
-  for(i=0;i<ICELTOT;i++) fscanf(fp,"%d",&NTYPE);
-  
-  for(icel=0;icel<ICELTOT;icel++){
-    fscanf(fp,"%d %d %d %d %d %d %d %d %d %d",&ii,&IMAT,
-	   &ICELNOD_g(icel,0),&ICELNOD_g(icel,1),&ICELNOD_g(icel,2),&ICELNOD_g(icel,3),
-	   &ICELNOD_g(icel,4),&ICELNOD_g(icel,5),&ICELNOD_g(icel,6),&ICELNOD_g(icel,7));
+
+  icel= 0;
+  for(k=0;k<nxe;k++){
+    for(j=0;j<nxe;j++){
+      for(i=0;i<nxe;i++){
+        n0= 1 + i + j*nxn + k*nn;          /* 下面の原点側節点 (1 origin) */
+        ICELNOD_g(icel,0)= n0;
+        ICELNOD_g(icel,1)= n0 + 1;
+        ICELNOD_g(icel,2)= n0 + 1 + nxn;
+        ICELNOD_g(icel,3)= n0     + nxn;
+        ICELNOD_g(icel,4)= n0          + nn;
+        ICELNOD_g(icel,5)= n0 + 1      + nn;
+        ICELNOD_g(icel,6)= n0 + 1 + nxn+ nn;
+        ICELNOD_g(icel,7)= n0     + nxn+ nn;
+        icel++;
+      }
+    }
   }
 
 /**
    NODE grp. info.
 **/
-  fscanf(fp,"%d",&NODGRPtot);
-  
+  NODGRPtot= 4;
+
   NODGRP_INDEX=(KINT*  )allocate_vector(sizeof(KINT),NODGRPtot+1);
   NODGRP_NAME =(CHAR80*)allocate_vector(sizeof(CHAR80),NODGRPtot);
-  for(i=0;i<NODGRPtot+1;i++) NODGRP_INDEX[i]=0;
-  
-  for(i=0;i<NODGRPtot;i++) fscanf(fp,"%d",&NODGRP_INDEX[i+1]);
-  nn=NODGRP_INDEX[NODGRPtot];
-  NODGRP_ITEM_g=View1D<KINT>("NODGRP_ITEM",nn);
-  
-  for(k=0;k<NODGRPtot;k++){
-    iS= NODGRP_INDEX[k];
-    iE= NODGRP_INDEX[k+1];
-    fscanf(fp,"%s",NODGRP_NAME[k].name);
-    nn= iE - iS;
-    if( nn != 0 ){
-      for(kk=iS;kk<iE;kk++) fscanf(fp,"%d",&NODGRP_ITEM_g(kk));
-    }
-  }
+  for(i=0;i<NODGRPtot+1;i++) NODGRP_INDEX[i]= i * nn;  /* 各面 nxn*nxn 節点 */
 
-  fclose(fp);
+  NODGRP_ITEM_g=View1D<KINT>("NODGRP_ITEM",NODGRP_INDEX[NODGRPtot]);
+
+  strcpy(NODGRP_NAME[0].name,"Xmin");
+  strcpy(NODGRP_NAME[1].name,"Ymin");
+  strcpy(NODGRP_NAME[2].name,"Zmin");
+  strcpy(NODGRP_NAME[3].name,"Zmax");
+
+  ib= 0;
+  for(k=0;k<nxn;k++) for(j=0;j<nxn;j++) NODGRP_ITEM_g(ib++)= 1 +     j*nxn + k*nn;
+  for(k=0;k<nxn;k++) for(i=0;i<nxn;i++) NODGRP_ITEM_g(ib++)= 1 + i         + k*nn;
+  for(j=0;j<nxn;j++) for(i=0;i<nxn;i++) NODGRP_ITEM_g(ib++)= 1 + i + j*nxn;
+  for(j=0;j<nxn;j++) for(i=0;i<nxn;i++) NODGRP_ITEM_g(ib++)= 1 + i + j*nxn + (nxn-1)*nn;
 }
-

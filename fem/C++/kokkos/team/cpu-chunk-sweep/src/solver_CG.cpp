@@ -4,9 +4,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include "precision.h"
 #include "allocate.h"
-#include "kokkos_settings.h"
+/* pfem_util.h が precision.h / kokkos_settings.h を取り込む。
+   precision.h は include guard を持たないので二重 include しないこと。 */
+#include "pfem_util.h"
 extern FILE *fp_log;
 /***
     CG solves the linear system Ax = b using the Conjugate Gradient 
@@ -267,4 +268,13 @@ void  CG  (
     INTERFACE data EXCHANGE
 ***/
 
+  /* 非 Kokkos 実装 (solver_CG.c) と同じ式で FLOP を計上する。
+     これを出さないと Kokkos 側だけ GFlop/s を後段で解析的に復元する
+     ことになり、式の取り違えで性能値がずれる。 */
+  FLOP = (double)ITER*(N*14 + NPLU*2) + N*3 + NPLU*2;
+
+  /* 引数の ITER / RESID はグローバルを shadow しているので、実反復回数と
+     到達残差を別名のグローバルに保存して test1 から参照できるようにする。 */
+  ITERactual  = ITER;
+  RESIDactual = RESID;
 }

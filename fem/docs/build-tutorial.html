@@ -345,18 +345,18 @@ cmake --build build-local-gpu</code></pre>
 </div>
 
 <div class="step">
-<h4>実行 (引数は INPUT.DAT のパス)</h4>
+<h4>実行 (引数は 1 辺あたりの節点数 N)</h4>
 <div class="code-block">
   <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
-<pre><code># variant ディレクトリは 3 階層なので input/ は ../../../ にある
-cp ../../../input/INPUT.DAT ../../../input/cube.0 .   # mesh は CWD 相対で探される
-./build-local-gpu/fem.gpu.32 INPUT.DAT</code></pre>
+<pre><code># メッシュは実行時に内部生成されるので入力ファイルは不要
+./build-local-gpu/fem.gpu.32 65</code></pre>
 </div>
 
-<p>引数は <span class="key">制御ファイル INPUT.DAT のパス</span>です。メッシュファイル名 (<code>cube.0</code>)
-は INPUT.DAT の 1 行目に書かれており、<strong>カレントディレクトリから</strong>読まれます
-(同梱の <code>cube.0</code> は 65<sup>3</sup> 節点 = 274,625 節点、64<sup>3</sup> 六面体要素)。
-別サイズのメッシュは <code>python3 ../../../input/gen_cube.py 33 cube.0</code> のように生成できます。</p>
+<p>引数は <span class="key">1 辺あたりの節点数 N</span> です (diffusion / nbody と同じく入力ファイルは持ちません)。
+<code>65</code> なら 65<sup>3</sup> = 274,625 節点、64<sup>3</sup> 六面体要素の立方体メッシュが<strong>実行時に内部生成</strong>されます。
+<code>N</code> を変えるだけで任意サイズが解けます (<code>33</code> なら 35,937 節点)。
+2 番目以降の引数 <code>ITER</code> / <code>COND</code> / <code>QVOL</code> / <code>RESID</code> は省略可で、
+既定は 2000 / 1.0 / 1.0 / 1.0e-08 です。</p>
 
 <p>標準出力例 (CSV、10 カラム):</p>
 <div class="code-block">
@@ -410,8 +410,7 @@ cp ../../../input/INPUT.DAT ../../../input/cube.0 .   # mesh は CWD 相対で�
 └── summary/                       # 既測の公開データ + 可視化
     ├── fem.csv                    # 統合データ (Kokkos + 非 Kokkos、18 列)
     ├── fem_dashboard.html         # インタラクティブ可視化
-    ├── parse_logs.py              # 実行ログ → fem.csv 形式に変換
-    ├── parse_kokkos_logs.py       # Kokkos 実行ログ用
+    ├── parse_logs.py              # 実行ログ (10 列 CSV) → fem.csv 形式 (18 列) に変換
     └── visualize.py               # ダッシュボード生成器</code></pre>
 </div>
 
@@ -522,7 +521,7 @@ make -f Makefile.gen.miyabi.uni</code></pre>
 
 <div class="step">
 <h4>実行 (ジョブスクリプトを投入)</h4>
-<p>Miyabi はバッチジョブ専用 (PBS Pro)。<code>configure.py</code> が <code>run.miyabi.uni.sh</code> を <span class="key">自動生成</span>します。入力 (<code>INPUT.DAT</code>, <code>cube.0</code>) のコピーと実行行は生成済みで、課金グループ (<code>group_list</code>) にも <code>id -gn</code> の primary group が埋まるので、そのままで良ければ <code>qsub</code> するだけです (違う場合は <code>--group</code> で指定)。以下は実際に生成されるスクリプトの中身 (machine yaml の <code>job:</code> ブロックから組み立て):</p>
+<p>Miyabi はバッチジョブ専用 (PBS Pro)。<code>configure.py</code> が <code>run.miyabi.uni.sh</code> を <span class="key">自動生成</span>します。実行行は生成済みで (メッシュは内部生成のため入力ファイル不要)、課金グループ (<code>group_list</code>) にも自動検出値が埋まるので、そのままで良ければ <code>qsub</code> するだけです (違う場合は <code>--group</code> で指定)。以下は実際に生成されるスクリプトの中身 (machine yaml の <code>job:</code> ブロックから組み立て):</p>
 
 <div class="code-block">
   <div class="code-header"><span class="code-label">run.miyabi.uni.sh (自動生成)</span><button class="copy-btn">コピー</button></div>
@@ -551,20 +550,18 @@ export OMP_PLACES=threads
 
 
 # === 実行 ===
-#   argv[1] は制御ファイル (INPUT.DAT)。メッシュファイル名 (cube.0) は
-#   INPUT.DAT の 1 行目に書かれており、カレントディレクトリから読まれる。
-#   そのため入力一式をカレントにコピーしてから実行する。
-INPUT_DIR=../../../input
-cp -f ${INPUT_DIR}/INPUT.DAT ${INPUT_DIR}/cube.0 .
-#   別サイズのメッシュを使う場合 (例: 33^3 節点):
-#     python3 ${INPUT_DIR}/gen_cube.py 33 cube.0
-./build-miyabi-uni/fem.uni.32 INPUT.DAT</code></pre>
+#   立方体メッシュは実行時に内部生成されるので入力ファイルは不要。
+#   引数: N [ITER] [COND] [QVOL] [RESID]  (2 番目以降は省略可)
+#     ITER =CG 最大反復数 (既定 2000)  COND =熱伝導率 (既定 1.0)
+#     QVOL =体積発熱 (既定 1.0)        RESID=収束判定 (既定 1.0e-08)
+N=65
+./build-miyabi-uni/fem.uni.32 $N</code></pre>
 </div>
 
 <div class="code-block">
   <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
 <pre><code>qsub run.miyabi.uni.sh         # ジョブ投入
-qstat -u $USER                 # 状態確認
+qstat                          # 状態確認
 # 完了後、fem.o&lt;jobid&gt; に標準出力が書き出される (#PBS -N "fem" のため)</code></pre>
 </div>
 
@@ -585,27 +582,25 @@ qstat -u $USER                 # 状態確認
 <thead><tr><th>カラム</th><th>内容</th><th>単位</th></tr></thead>
 <tbody>
 <tr><td>binary</td><td>実行バイナリのパス</td><td>string</td></tr>
-<tr><td>NP</td><td><strong>節点数 (DOF) — mesh で決まる (cube.0 = 274625)</strong></td><td>int</td></tr>
+<tr><td>NP</td><td><strong>節点数 (DOF) — 引数 N で決まる (N=65 なら 274625)</strong></td><td>int</td></tr>
 <tr><td>time_sec</td><td>CG ソルバ計算時間</td><td>秒</td></tr>
 <tr><td>performance_gflops</td><td>演算性能 (FLOP / solver_time)</td><td>GFLOPS</td></tr>
-<tr><td>error</td><td><strong>INPUT.DAT の RESID 設定値</strong> (収束後の残差ではない。下の注意を参照)</td><td>float</td></tr>
+<tr><td>error</td><td><strong>RESID の設定値</strong> (収束後の残差ではない。下の注意を参照)</td><td>float</td></tr>
 <tr><td>real_sec</td><td>プログラム全体の wall clock 時間</td><td>秒</td></tr>
 <tr><td>user_sec</td><td>user CPU 時間 (Fortran は cpu_time() 代用)</td><td>秒</td></tr>
 <tr><td>sys_sec</td><td>sys CPU 時間 (Fortran は 0.0 固定)</td><td>秒</td></tr>
-<tr><td>num_time_steps_logged</td><td><strong>INPUT.DAT の最大反復数 ITER</strong> (実反復数ではない。下の注意を参照)</td><td>int</td></tr>
+<tr><td>num_time_steps_logged</td><td><strong>最大反復数 ITER の設定値</strong> (実反復数ではない。下の注意を参照)</td><td>int</td></tr>
 <tr><td>last_sim_time</td><td><strong>matrix assembly 時間</strong> (fem 特有: mat_sec)</td><td>秒</td></tr>
 </tbody>
 </table>
 
-<p><strong>注意 (<code>error</code> と <code>num_time_steps_logged</code>)</strong>:
-<code>SOLVE11()</code> は <code>ITERactual = ITER</code> としているが、<code>CG()</code> は
-<code>ITER</code> と <code>RESID</code> を値渡しで受け取るため、収束した反復数・残差は
-呼び出し元に戻らない。よって CSV の <code>error</code> は INPUT.DAT の収束判定値 (既定
-<code>1.0e-08</code>)、<code>num_time_steps_logged</code> は INPUT.DAT の最大反復数 (既定
-<code>2000</code>) がそのまま出力される。実際の反復履歴が必要な場合は
-<code>BENCHMARK_MODE</code> を外してビルドすると、標準出力に
-<code>&lt;反復数&gt; &lt;残差&gt;</code> が 1 行ずつ出る (同梱 <code>cube.0</code> + 既定設定なら
-197 反復・残差 8.292404e-09 で収束)。</p>
+<p><strong><code>error</code> と <code>num_time_steps_logged</code> の読み方</strong>:
+CG が到達した残差と、実際に回した反復回数が入る (C / Fortran / Kokkos 共通)。
+<code>N=65</code> + 既定設定なら <strong>197 反復・残差 8.292404e-09</strong> で収束し、
+この値はスレッド数や実行モード (CPU / GPU) によらず再現する。収束しなかった場合は
+<code>num_time_steps_logged</code> に最大反復数 +1 (既定なら <code>2001</code>)、
+<code>error</code> に打ち切り時の残差が出るので、CSV を見れば収束の成否が判別できる。</p>
+
 
 <p><code>#</code> で始まる 1 行目は CSV のコメント行 (列名)。
 <code>awk '!/^#/'</code> や <code>pandas.read_csv(comment='#')</code> でデータ行だけ抽出できます。</p>
@@ -733,20 +728,18 @@ export OMP_PLACES=threads
 
 
 # === 実行 ===
-#   argv[1] は制御ファイル (INPUT.DAT)。メッシュファイル名 (cube.0) は
-#   INPUT.DAT の 1 行目に書かれており、カレントディレクトリから読まれる。
-#   そのため入力一式をカレントにコピーしてから実行する。
-INPUT_DIR=../../../input
-cp -f ${INPUT_DIR}/INPUT.DAT ${INPUT_DIR}/cube.0 .
-#   別サイズのメッシュを使う場合 (例: 33^3 節点):
-#     python3 ${INPUT_DIR}/gen_cube.py 33 cube.0
-./build-miyabi-gpu/fem.gpu.32 INPUT.DAT</code></pre>
+#   立方体メッシュは実行時に内部生成されるので入力ファイルは不要。
+#   引数: N [ITER] [COND] [QVOL] [RESID]  (2 番目以降は省略可)
+#     ITER =CG 最大反復数 (既定 2000)  COND =熱伝導率 (既定 1.0)
+#     QVOL =体積発熱 (既定 1.0)        RESID=収束判定 (既定 1.0e-08)
+N=65
+./build-miyabi-gpu/fem.gpu.32 $N</code></pre>
 </div>
 
 <div class="code-block">
   <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
 <pre><code>qsub run.miyabi.gpu.sh         # ジョブ投入
-qstat -u $USER                 # 状態確認</code></pre>
+qstat                          # 状態確認</code></pre>
 </div>
 
 <div class="note">
@@ -889,13 +882,13 @@ cmake -B build-miyabi-gpu -S . && cmake --build build-miyabi-gpu</code></pre>
 <tr><td><code>--extra-cflags</code></td><td>no</td><td>str</td><td>追加 compile flag (非 Kokkos のみ)</td></tr>
 <tr><td><code>--list</code></td><td>no</td><td>—</td><td>variant / machine 一覧</td></tr>
 <tr><td><code>--info</code></td><td>no</td><td>—</td><td>設定一覧 (3 階層)</td></tr>
-<tr><td><code>--group</code></td><td>no</td><td>str</td><td>ジョブスクリプトの課金グループ (PBS <code>group_list</code> / PJM <code>-g</code>)。省略時は <code>id -gn</code> で自動取得</td></tr>
+<tr><td><code>--group</code></td><td>no</td><td>str</td><td>ジョブスクリプトの課金グループ (PBS <code>group_list</code> / PJM <code>-g</code>)。省略時は machine yaml の <code>job.group_patterns</code> と <code>id -Gn</code> / <code>id -gn</code> で自動取得</td></tr>
 <tr><td><code>--kokkos-root</code></td><td>no</td><td>str</td><td>Kokkos の install prefix。省略時は machine yaml の <code>kokkos.root</code> を使い、それが placeholder のときだけ <code>Kokkos_ROOT</code>/<code>KOKKOS_ROOT</code>、<code>CMAKE_PREFIX_PATH</code>、<code>~/kokkos/*</code> 等から自動検出。見つからない場合は指定を促して終了</td></tr>
 <tr><td><code>--queue</code></td><td>no</td><td>str</td><td>ジョブスクリプトの投入キュー (PBS <code>-q</code> / PJM <code>-L rscgrp</code>)。省略時は machine yaml の <code>job.per_mode.&lt;mode&gt;.queue</code>。<code>scheduler: none</code> の machine (local) に渡すと ERROR</td></tr>
 <tr><td><code>--dry-run</code></td><td>no</td><td>—</td><td>ビルドファイルの生成内容を stdout 表示 (書き込まない)</td></tr>
 <tr><td><code>--dry-job</code></td><td>no</td><td>—</td><td>ジョブスクリプトの生成内容を stdout 表示 (<code>--dry-run</code> と併用で両方)</td></tr>
-<tr><td><code>--clean</code></td><td>no</td><td>—</td><td>生成物と実行時コピー (<code>INPUT.DAT</code>, <code>cube.0</code>) を削除 (実行結果 <code>test.inp</code>/<code>log.log</code> と <code>results/</code> は残す)</td></tr>
-<tr><td><code>--allclean</code></td><td>no</td><td>—</td><td><code>--clean</code> に加えて <code>test.inp</code>, <code>log.log</code> も削除 (<code>results/</code> は残す)</td></tr>
+<tr><td><code>--clean</code></td><td>no</td><td>—</td><td>生成物を削除 (実行結果 <code>log.log</code> と <code>results/</code> は残す)</td></tr>
+<tr><td><code>--allclean</code></td><td>no</td><td>—</td><td><code>--clean</code> に加えて <code>log.log</code> (と、有効化時の <code>test.inp</code>) も削除 (<code>results/</code> は残す)</td></tr>
 <tr><td><code>--yes</code>, <code>-y</code></td><td>no</td><td>—</td><td><code>--clean</code>/<code>--allclean</code> の確認プロンプトを省略 (非対話環境では必須)</td></tr>
 </tbody>
 </table>
@@ -996,8 +989,8 @@ cmake -B build-miyabi-gpu -S . && cmake --build build-miyabi-gpu</code></pre>
 <thead><tr><th>項目</th><th>値</th></tr></thead>
 <tbody>
 <tr><td>統合 CSV</td><td><code>summary/fem.csv</code> (行数は計測を追記するたびに増えます)</td></tr>
-<tr><td>非 Kokkos 行</td><td>379 (mizuho 由来 + 本リポジトリでの追試、Miyabi/Wisteria 実機計測)</td></tr>
-<tr><td>Kokkos 行</td><td>76</td></tr>
+<tr><td>非 Kokkos 行</td><td>343 (Miyabi / Wisteria 実機計測)</td></tr>
+<tr><td>Kokkos 行</td><td>364 (Miyabi: 12 variant × FP32/64 × 4 サイズ × 3 回 + 既存分、Wisteria: 4 variant × FP64 × 4 サイズ)</td></tr>
 <tr><td>問題サイズ NP</td><td>4913 (17<sup>3</sup>) / 35937 (33<sup>3</sup>) / 274625 (65<sup>3</sup>) / 2146689 (129<sup>3</sup>)</td></tr>
 <tr><td>machine</td><td>miyabi, wisteria</td></tr>
 <tr><td>精度</td><td>FP=32 / FP=64</td></tr>
@@ -1013,7 +1006,7 @@ optimization_type, optimization_param, fp, N,
 time_sec, performance_gflops, error,
 real_sec, user_sec, sys_sec, source_file</code></pre>
 </div>
-<p>fem では mesh ファイル (cube.0) で問題サイズが決まるため、<code>nx/ny/nz</code> カラムは持ちません (<code>N</code> = NP のみ)。<code>real_sec/user_sec/sys_sec</code> は旧 mizuho ベンチでは未計測のため空、新しく test1.c で取得した行で実値が入ります。</p>
+<p>fem では引数 N (1 辺あたりの節点数) で問題サイズが決まるため、<code>nx/ny/nz</code> カラムは持ちません (<code>N</code> = NP のみ)。<code>real_sec/user_sec/sys_sec</code> は、これらを出力するようになる前に取得された古い行では空欄です。</p>
 
 <h3>ダッシュボードの典型的な使い方</h3>
 <table>
@@ -1102,10 +1095,10 @@ pip install cmake</code></pre>
 
 <details>
 <summary><code>ERROR: insufficient number of input parameters</code></summary>
-<p>INPUT.DAT のパス引数を渡し忘れ:</p>
+<p>節点数 N の引数を渡し忘れ:</p>
 <div class="code-block">
   <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
-<pre><code>./build-local-gpu/fem.gpu.32 INPUT.DAT    # ← 制御ファイルのパスが必須 (../../../input/INPUT.DAT でも可)</code></pre>
+<pre><code>./build-local-gpu/fem.gpu.32 65    # ← 1 辺あたりの節点数 N が必須</code></pre>
 </div>
 </details>
 
@@ -1116,7 +1109,7 @@ pip install cmake</code></pre>
   <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
 <pre><code>cmake -B build-local-gpu-fp64 -S . -DFP=64
 cmake --build build-local-gpu-fp64
-./build-local-gpu-fp64/fem.gpu.64 INPUT.DAT     # INPUT.DAT と cube.0 は CWD にコピー済みとする</code></pre>
+./build-local-gpu-fp64/fem.gpu.64 65</code></pre>
 </div>
 </details>
 
@@ -1131,9 +1124,9 @@ nvidia-smi
 nvidia-smi -l 1
 
 # 実行時環境変数で GPU 詳細出力
-NVCOMPILER_ACC_NOTIFY=1 ./build-local-gpu/fem.gpu.32 INPUT.DAT</code></pre>
+NVCOMPILER_ACC_NOTIFY=1 ./build-local-gpu/fem.gpu.32 65</code></pre>
 </div>
-<p>メッシュが小さすぎると GPU を使い切れず CPU より遅いこともある。<code>gen_cube.py</code> で大きいメッシュを作って再評価する。</p>
+<p>メッシュが小さすぎると GPU を使い切れず CPU より遅いこともある。引数 <code>N</code> を大きくして (例: <code>129</code>) 再評価する。</p>
 </details>
 
 <details>

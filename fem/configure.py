@@ -64,12 +64,15 @@ EXERCISE_SUFFIX = ".exercise"
 EXERCISE_NOTE = "EXERCISE.md"
 
 # 実行時に variant ディレクトリへ生成されるもののうち、計算結果ではないもの
-# (--clean で削除する)。run スクリプトが input/ からコピーする入力一式。
+# (--clean で削除する)。メッシュは内部生成になったので現在の run スクリプトは
+# 何もコピーしないが、旧方式 (input/ からのコピー) の残骸を掃除できるよう残す。
 RUN_ARTIFACTS: List[str] = ["INPUT.DAT", "cube.0"]
 
 # 実行結果の出力先 (--clean では残し、--allclean のときだけ削除する)
-#   test.inp … output_ucd.c が書く可視化用 UCD ファイル
-#   log.log  … test1.c が書く反復履歴ログ
+#   log.log  … test1.c が書く反復履歴ログ (実際に生成されるのはこれだけ)
+#   test.inp … output_ucd.c が書く可視化用 UCD ファイル。現在はどの variant も
+#              OUTPUT_UCD() の呼び出しをコメントアウトしているため生成されない。
+#              有効化したときに掃除できるようリストには残してある。
 OUTPUT_ARTIFACTS: List[str] = ["test.inp", "log.log"]
 
 
@@ -94,13 +97,29 @@ def list_machines() -> List[str]:
     return sorted(p.stem for p in md.glob("*.yaml"))
 
 
-def detect_primary_group() -> Optional[str]:
-    """`id -gn` で primary group 名を取得。失敗時は None。
-    Linux クラスタでは primary group が課金グループ (gtXX/gjXX/grXX 等) に
-    設定されていることが多く、yaml の placeholder を上書きするのに使える。
+def detect_billing_group(patterns: Optional[List[str]] = None) -> Optional[str]:
+    """課金グループ名 (PBS group_list / PJM -g) を自動検出する。失敗時は None。
+
+    探索順:
+      1. machine yaml の job.group_patterns (fnmatch) が指定されていれば、
+         `id -Gn` の所属グループから最初に一致したものを採用する。
+         Miyabi のように primary group がユーザ専用グループ (ユーザ名と同名)
+         で、課金グループ (grXX 等) が補助グループ側にある環境ではこれが必要。
+      2. パターン未指定 / 一致なしの場合は `id -gn` の primary group。
+         ただし primary group がユーザ名と同一の場合はユーザ専用の
+         プライベートグループであり課金グループではないので採用しない
+         (誤った group_list でジョブが弾かれるのを防ぐ)。
     """
-    out = _run_cmd(["id", "-gn"])
-    return out or None
+    if patterns:
+        groups = (_run_cmd(["id", "-Gn"]) or "").split()
+        for pat in patterns:
+            for g in groups:
+                if fnmatch.fnmatch(g, pat):
+                    return g
+    primary = _run_cmd(["id", "-gn"]) or None
+    if primary and primary == (_run_cmd(["id", "-un"]) or None):
+        return None
+    return primary
 
 
 def is_placeholder_group(g: str) -> bool:
@@ -118,8 +137,33 @@ def is_kokkos_install(prefix: str) -> bool:
     return False
 
 
+def detect_kokkos_cxx_compiler(root: str) -> Optional[str]:
+    """Kokkos install から、その Kokkos をビルドした C++ コンパイラのパスを取得する。
+
+    Kokkos はアプリ側も「Kokkos をビルドしたのと同じコンパイラ」でビルドする必要が
+    ある (CUDA backend なら nvcc_wrapper 等)。違うコンパイラだと Kokkos が interface
+    で渡すフラグ (-arch=sm_90, -mp 等) が解釈できずビルドが落ちる。
+    install 済みの KokkosConfigCommon.cmake に記録された Kokkos_CXX_COMPILER を読む。
+    見つからなければ None (呼び出し側は CMake の既定コンパイラに任せる)。
+    """
+    if not root:
+        return None
+    for libdir in ("lib", "lib64"):
+        p = os.path.join(root, libdir, "cmake", "Kokkos", "KokkosConfigCommon.cmake")
+        if not os.path.isfile(p):
+            continue
+        try:
+            with open(p) as f:
+                m = re.search(r'set\(Kokkos_CXX_COMPILER\s+"([^"]+)"\)', f.read())
+        except OSError:
+            continue
+        if m and os.path.exists(m.group(1)):
+            return m.group(1)
+    return None
+
+
 def detect_kokkos_root() -> Optional[str]:
-    """Kokkos install prefix を自動検出する。--group の `id -gn` に相当する仕組み。
+    """Kokkos install prefix を自動検出する。--group の課金グループ検出に相当する仕組み。
 
     探索順:
       1. 環境変数 Kokkos_ROOT / KOKKOS_ROOT (CMake の find_package(Kokkos) も参照する)
@@ -788,13 +832,14 @@ def generate_job_script(cfg: dict, args, machine: dict, machine_name: str,
 
     # group_list 解決順 (--group と同じ思想):
     #   1. --group CLI で明示指定された値があれば最優先
-    #   2. なければ yaml.default_group が placeholder の時に `id -gn` で検出
+    #   2. なければ yaml.default_group が placeholder の時に自動検出
+    #      (job.group_patterns → `id -Gn`、無ければ `id -gn`)
     #   3. それも無理なら placeholder のまま (要手動編集)
     # 注: PJM/PBS のディレクティブ行末にインラインコメント (`#`) を置くと
     # スケジューラが option として解釈してエラーになる。コメントは別行に置く。
     yaml_group = job.get("default_group", "xxx")
     is_placeholder = is_placeholder_group(yaml_group)
-    detected_group = detect_primary_group()  # 常に検出 (CLI 値との比較用)
+    detected_group = detect_billing_group(job.get("group_patterns"))  # 常に検出 (CLI 値との比較用)
     cli_group = getattr(args, "group", None)
 
     if cli_group:
@@ -803,7 +848,7 @@ def generate_job_script(cfg: dict, args, machine: dict, machine_name: str,
         group_unresolved = False
         # 自動検出値と違う場合は標準出力に警告 (バッチスケジューラがある時のみ意味あり)
         if scheduler in ("pbs", "pjm") and detected_group and detected_group != cli_group:
-            print(f"  [WARN] --group '{cli_group}' は `id -gn` 検出値 '{detected_group}' と異なります。"
+            print(f"  [WARN] --group '{cli_group}' は自動検出値 '{detected_group}' と異なります。"
                   f"指定値 '{cli_group}' を使用します。")
         group_pre_comment = (
             f"# group_list: '{cli_group}' (--group で明示指定)"
@@ -814,7 +859,7 @@ def generate_job_script(cfg: dict, args, machine: dict, machine_name: str,
         # yaml が placeholder で自動検出が成功
         resolved_group = detected_group
         group_unresolved = False
-        group_pre_comment = f"# group_list: primary group ({detected_group}) を自動検出。違う場合は --group で明示指定"
+        group_pre_comment = f"# group_list: 課金グループ ({detected_group}) を自動検出。違う場合は --group で明示指定"
     elif is_placeholder and not detected_group:
         # 検出失敗 (placeholder のまま)
         resolved_group = yaml_group
@@ -864,7 +909,7 @@ def generate_job_script(cfg: dict, args, machine: dict, machine_name: str,
             "# !!! 警告: 課金グループ (group_list) の自動検出に失敗しました !!!",
             "# ============================================================",
             f"# yaml の default_group は placeholder ('{yaml_group}')、",
-            "# `id -gn` も有効な値を返しませんでした。",
+            "# 自動検出 (job.group_patterns / `id -gn`) も有効な値を返しませんでした。",
             "#",
             "# 投入前に下記の行を編集してください:",
             "#   PBS:  '#PBS -W group_list=<YOUR_GROUP>'",
@@ -952,20 +997,15 @@ def generate_job_script(cfg: dict, args, machine: dict, machine_name: str,
             f"fi",
         ]
 
-    # variant_dir から APP_ROOT への相対パス (C++/stdpar/auto.def なら ../../..)
-    rel_to_root = os.path.relpath(APP_ROOT, variant_dir)
-
     lines += [
         "",
-        "# === 実行 ===",
-        "#   argv[1] は制御ファイル (INPUT.DAT)。メッシュファイル名 (cube.0) は",
-        "#   INPUT.DAT の 1 行目に書かれており、カレントディレクトリから読まれる。",
-        "#   そのため入力一式をカレントにコピーしてから実行する。",
-        f"INPUT_DIR={rel_to_root}/input",
-        "cp -f ${INPUT_DIR}/INPUT.DAT ${INPUT_DIR}/cube.0 .",
-        "#   別サイズのメッシュを使う場合 (例: 33^3 節点):",
-        "#     python3 ${INPUT_DIR}/gen_cube.py 33 cube.0",
-        f"{bin_rel} INPUT.DAT",
+        "# === 実行 (N = 1 辺あたりの節点数; 65 → 65x65x65 = 274625 節点) ===",
+        "#   立方体メッシュは実行時に内部生成されるので入力ファイルは不要。",
+        "#   引数: N [ITER] [COND] [QVOL] [RESID]  (2 番目以降は省略可)",
+        "#     ITER =CG 最大反復数 (既定 2000)  COND =熱伝導率 (既定 1.0)",
+        "#     QVOL =体積発熱 (既定 1.0)        RESID=収束判定 (既定 1.0e-08)",
+        f"N=65",
+        f"{bin_rel} $N",
     ]
 
     content = "\n".join(lines) + "\n"
@@ -1206,6 +1246,19 @@ def generate_cmake(cfg: dict, args, machine_name: str) -> Tuple[Path, str]:
     if cfg["f90_cmd"]:
         lines.append(f'set(CMAKE_Fortran_COMPILER "{cfg["f90_cmd"]}")')
 
+    # project() はコンパイラ動作確認の try_compile を走らせる。そのテストは
+    # CMAKE_<LANG>_FLAGS ではなく *_FLAGS_INIT 由来の初期値しか見ないため、
+    # ツールチェーン指定 (例: icx の --gcc-toolchain) をここで渡しておかないと
+    # 「compiler is not able to compile a simple test program」で落ちる。
+    lines.append("")
+    lines.append("# コンパイラ動作確認 (project()) にもフラグを効かせるための初期値")
+    if "C" in cmake_langs:
+        lines.append(f'set(CMAKE_C_FLAGS_INIT "{" ".join(cc_flags)}")')
+    if "CXX" in cmake_langs:
+        lines.append(f'set(CMAKE_CXX_FLAGS_INIT "{" ".join(cxx_flags)}")')
+    if "Fortran" in cmake_langs:
+        lines.append(f'set(CMAKE_Fortran_FLAGS_INIT "{" ".join(f90_flags)}")')
+
     lines += [
         f"",
         f"project({APP_NAME} LANGUAGES {cmake_langs_str})",
@@ -1318,6 +1371,22 @@ def generate_cmake_kokkos(cfg: dict, args, machine_name: str) -> Tuple[Path, str
             "find_package(Kokkos REQUIRED)",
         ]
 
+    # Kokkos をビルドしたコンパイラをアプリ側の既定にする (project() より前に必要)。
+    # これが無いと PATH 先頭の別コンパイラ (Miyabi なら nvc++) が選ばれ、Kokkos が
+    # interface で渡す nvcc 系フラグ (-arch=sm_90 等) を解釈できずビルドが落ちる。
+    kcxx = detect_kokkos_cxx_compiler(kroot)
+    kokkos_compiler_block: List[str] = []
+    if kcxx:
+        kokkos_compiler_block = [
+            f"",
+            f"# Kokkos をビルドした C++ コンパイラ (Kokkos install の記録より)。",
+            f"# Kokkos はアプリ側も同じコンパイラでのビルドを要求する。",
+            f"# 別のものを使う場合は cmake -DCMAKE_CXX_COMPILER=... で上書き可。",
+            f"if(NOT DEFINED CMAKE_CXX_COMPILER)",
+            f'  set(CMAKE_CXX_COMPILER "{kcxx}" CACHE FILEPATH "C++ compiler used to build Kokkos")',
+            f"endif()",
+        ]
+
     lines = [
         f"cmake_minimum_required(VERSION 3.20)",
         f"",
@@ -1326,6 +1395,7 @@ def generate_cmake_kokkos(cfg: dict, args, machine_name: str) -> Tuple[Path, str
         f"# Config: variant={args.variant} machine={machine_name} mode={args.mode}",
         f"#         (Kokkos: policy={cfg['policy']} sub={cfg['sub']} uvm={cfg['is_uvm']})",
         f"# DO NOT EDIT — re-run configure.py to regenerate.",
+        *kokkos_compiler_block,
         f"",
         f"project({APP_NAME} LANGUAGES CXX)",
         f"",
@@ -1717,7 +1787,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="NAME",
         help="ジョブスクリプトの課金グループ (PBS group_list / PJM -g) を明示指定。"
-             "省略時は `id -gn` で primary group を自動検出。"
+             "省略時は machine yaml の job.group_patterns と `id -Gn`/`id -gn` で自動検出。"
              "明示値が自動検出値と異なる場合は標準出力に警告を表示。",
     )
     p.add_argument(
@@ -2065,8 +2135,26 @@ def main() -> int:
     kokkos_extra_opts: List[str] = []
     if args.opt_level is not None:
         if cfg.get("is_kokkos"):
-            kokkos_extra_opts.append(
-                "-fast" if args.opt_level == "fast" else f"-{args.opt_level}")
+            # Kokkos variant は Kokkos をビルドしたコンパイラでビルドされる。
+            # 'fast' の綴りはコンパイラごとに違うので読み替える:
+            #   NVHPC (nvc++)            : -fast
+            #   nvcc / nvcc_wrapper      : -Xcompiler -Ofast
+            #       (-Ofast は nvcc 自身が -O<数字> と解釈して
+            #        "'fast': expected a number" で落ちるため、host に転送する)
+            #   GCC / Clang              : -Ofast
+            if args.opt_level == "fast":
+                kbase = os.path.basename(
+                    detect_kokkos_cxx_compiler(cfg.get("kokkos_root", "")) or "")
+                if kbase in ("nvc++", "nvc", "nvfortran"):
+                    kokkos_extra_opts.append("-fast")
+                elif "nvcc" in kbase:
+                    # 2 トークンで渡す ('-Xcompiler=-Ofast' の 1 トークン形式は
+                    # nvcc_wrapper が解釈できず host compiler にそのまま流れる)
+                    kokkos_extra_opts += ["-Xcompiler", "-Ofast"]
+                else:
+                    kokkos_extra_opts.append("-Ofast")
+            else:
+                kokkos_extra_opts.append(f"-{args.opt_level}")
         else:
             for key in ("cc_flags", "cxx_flags", "f90_flags"):
                 cfg[key], oldv = _apply_opt_level(cfg.get(key, []), args.opt_level)
@@ -2287,7 +2375,7 @@ def main() -> int:
             print(f"  queue       : '{yaml_queue}' (machine yaml の job.per_mode.{args.mode}.queue。--queue で上書き可)")
         yaml_group = job_block.get("default_group", "xxx")
         cli_group = getattr(args, "group", None)
-        detected = detect_primary_group()
+        detected = detect_billing_group(job_block.get("group_patterns"))
         if cli_group:
             if detected and detected != cli_group:
                 print(f"  group_list  : '{cli_group}' (--group 明示指定、自動検出 '{detected}' と異なる)")
@@ -2295,7 +2383,7 @@ def main() -> int:
                 print(f"  group_list  : '{cli_group}' (--group 明示指定)")
         elif is_placeholder_group(yaml_group):
             if detected:
-                print(f"  group_list  : '{detected}' (primary group を自動検出。違う場合は --group で明示指定)")
+                print(f"  group_list  : '{detected}' (課金グループを自動検出。違う場合は --group で明示指定)")
             else:
                 print(f"  ! group_list は yaml で '{yaml_group}' に設定。実機では --group で指定するかスクリプトを編集してください。")
         else:

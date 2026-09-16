@@ -290,14 +290,14 @@ nvc++ ... misc.o diffusion.o main.o  -o diffusion.uni.32
 
 `configure.py` は variant ディレクトリに `run.<machine>.<mode>.sh` を**自動生成**します
 (machine yaml の `job:` ブロックから PBS / PJM / local 用の雛形を組み立て)。
-課金グループ (`group_list`) は `id -gn` の primary group が埋まり、実行行 (`N=64` とバイナリ呼び出し) も
+課金グループ (`group_list`) は `job.group_patterns` による自動検出値が埋まり、実行行 (`N=64` とバイナリ呼び出し) も
 生成済みなので、そのままで良ければ編集せずに投入できます (違う場合は `--group` で指定)。
 module のロードだけはコメントブロックとして推奨例が入っているので、必要に応じてコメントを外してください。
 
 ```bash
 # Miyabi (PBS Pro) — uni mode の例
 qsub run.miyabi.uni.sh
-qstat -u $USER                                   # 状態確認
+qstat                                            # 状態確認
 # 完了後、diffusion.o<jobid> に標準出力 (10 カラム CSV) が出力される
 #   (#PBS -N "diffusion" が入るためジョブ名ベースのファイル名になる)
 ```
@@ -667,7 +667,7 @@ spack install kokkos +cuda +openmp +wrapper cuda_arch=90 cxxstd=17 cflags="-O2"
 | `--list` | no | — | 使用可能な variant / machine を表示 |
 | `--info` | no | — | 設定一覧 (machine, compiler, 最適化, 精度) を 3 階層で表示 |
 | `--queue NAME` | no | str | ジョブスクリプトの投入キュー (PBS `-q` / PJM `-L rscgrp`)。省略時は machine yaml の `job.per_mode.<mode>.queue`。講習会用キューの指定に使う (例: `--queue tutorial-g`) |
-| `--group NAME` | no | str | ジョブスクリプトの課金グループ (PBS `group_list` / PJM `-g`)。省略時は `id -gn` で自動取得 |
+| `--group NAME` | no | str | ジョブスクリプトの課金グループ (PBS `group_list` / PJM `-g`)。省略時は machine yaml の `job.group_patterns` と `id -Gn` / `id -gn` で自動取得 |
 | `--kokkos-root PATH` | no | str | Kokkos の install prefix。省略時は machine yaml の `kokkos.root` を使い、それが placeholder (`/xxx/` 等) のときだけ `Kokkos_ROOT`/`KOKKOS_ROOT`、`CMAKE_PREFIX_PATH`、`~/kokkos/*`、`/opt/kokkos*`、`/usr/local`、spack から自動検出。見つからない場合は指定を促して終了 |
 | `--dry-run` | no | — | ビルドファイル (CMakeLists.txt / Makefile.gen.*) の生成内容を stdout に表示、書き込まない |
 | `--dry-job` | no | — | ジョブスクリプト (run.\<machine\>.\<mode\>.sh) の生成内容を stdout に表示、書き込まない。`--dry-run` と併用で両方 |
@@ -745,9 +745,9 @@ $ ./configure.py --variant C++/openmp-target/auto.def --machine local --mode gpu
 | 項目 | 値 |
 |---|---|
 | 統合 CSV | `summary/diffusion.csv` (行数は計測を追記するたびに増えます) |
-| 非 Kokkos 行 | mizuho 由来 (Miyabi/Wisteria 実機計測) + 本リポジトリでの追試 |
-| Kokkos 行 | kokkos_combined.csv 由来 + Wisteria-A での N 依存性追試 |
-| grid サイズ N | nx=32/64/128/256/512 (非 Kokkos・Kokkos とも) |
+| 非 Kokkos 行 | Miyabi / Wisteria 実機計測 |
+| Kokkos 行 | param sweep (両マシン、N=2097152 固定) と N 依存性 (Wisteria-A: 8 variant / Miyabi-G: 14 variant、各 5 点 × 3 回) |
+| grid サイズ N | nx=32/64/128/256/512。ただし Kokkos の sweep 系 variant (tile/chunk/opt-level) は Wisteria が nx=128 のみ |
 | machine | miyabi, wisteria |
 | 精度 | FP=32 / FP=64 |
 | impl 種類 | openmp-cpu, openmp-target, openacc, stdpar, do-concurrent, kokkos (6 種) |
@@ -760,7 +760,7 @@ optimization_type, optimization_param, fp, nx, ny, nz, N,
 time_sec, performance_gflops, error
 ```
 
-加えて `real_sec, user_sec, sys_sec, source_file` の 4 列 (Kokkos 行のみ実値、mizuho 行は空)。
+加えて `real_sec, user_sec, sys_sec, source_file` の 4 列 (これらを出力するようになる前に取得された古い行では空欄)。
 
 ### ダッシュボードの典型的な使い方
 
@@ -807,6 +807,28 @@ python3 diffusion/summary/visualize.py path/to/data.csv path/to/dash.html
 
 ---
 
+## impl と mode の対応
+
+`--mode` は実装ごとに使える値が決まっており、`configure.py` は対応しない組み合わせを
+ERROR で拒否します。これは教材としての役割分担を反映したものです。
+
+| impl | 使える mode | 役割 |
+|---|---|---|
+| `openmp-cpu` | `cpu` | **CPU ベースライン**。GPU 版と比較する基準 |
+| `openmp-target` / `openacc` | `gpu` / `uni` | ディレクティブで GPU 化する手段 |
+| `stdpar` / `do-concurrent` | `gpu` / `uni` | 言語標準で GPU 化する手段 |
+| `kokkos` | `gpu` / `cpu` | **同一ソースが CPU でも GPU でも動く** portability の実演 |
+
+`openmp-target` / `openacc` / `stdpar` / `do-concurrent` に `cpu` モードが無いのは、
+これらが **GPU 化のための記述方法**であり、CPU 実行の比較対象は `openmp-cpu` に
+一本化しているためです。`kokkos` だけ `cpu` を持つのは、backend を差し替えるだけで
+同じコードが CPU でも動くこと自体が Kokkos の主題だからです。
+
+`uni` (unified memory) は `gpu` の派生で、Miyabi のみ利用できます
+(NVHPC 24.1 の Wisteria は `mem:unified` 非対応)。
+
+---
+
 ## マシン × compiler の対応表
 
 | machine | default compiler | 使用可能 compiler | GPU compiler | サポート mode |
@@ -840,6 +862,11 @@ Kokkos variant: 14 種、いずれも cmake 強制で生成可能。
 ---
 
 ## 詳しく知りたい人向け
+
+このドキュメントは **現在の実装がどうなっているか** だけを説明しています。
+元コードからの変更点、計測データの由来、既知のデータ品質の問題は
+[../HISTORY.md](../HISTORY.md) にまとめてあります。
+
 
 各 impl の固有事情は impl ディレクトリ配下の README を参照:
 

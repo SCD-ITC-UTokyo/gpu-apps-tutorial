@@ -519,7 +519,7 @@ make -f Makefile.gen.miyabi.uni</code></pre>
 
 <div class="step">
 <h4>実行 (ジョブスクリプトを投入)</h4>
-<p>Miyabi はバッチジョブ専用 (PBS Pro)。<code>configure.py</code> が <code>run.miyabi.uni.sh</code> を <span class="key">自動生成</span>します。課金グループ (<code>group_list</code>) は <code>id -gn</code> の primary group が埋まるので、そのままで良ければ <code>qsub</code> するだけです (違う場合は <code>--group</code> で指定)。以下は実際に生成されるスクリプトの中身 (machine yaml の <code>job:</code> ブロックから組み立て):</p>
+<p>Miyabi はバッチジョブ専用 (PBS Pro)。<code>configure.py</code> が <code>run.miyabi.uni.sh</code> を <span class="key">自動生成</span>します。課金グループ (<code>group_list</code>) は machine yaml の <code>job.group_patterns</code> に基づいて自動検出され埋まるので、そのままで良ければ <code>qsub</code> するだけです (違う場合は <code>--group</code> で指定)。以下は実際に生成されるスクリプトの中身 (machine yaml の <code>job:</code> ブロックから組み立て):</p>
 
 <div class="code-block">
   <div class="code-header"><span class="code-label">run.miyabi.uni.sh (自動生成)</span><button class="copy-btn">コピー</button></div>
@@ -559,7 +559,7 @@ export OMP_PLACES=threads
 <div class="code-block">
   <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
 <pre><code>qsub run.miyabi.uni.sh         # ジョブ投入
-qstat -u $USER                 # 状態確認
+qstat                          # 状態確認
 # 完了後、nbody.o&lt;jobid&gt; に標準出力が書き出される (#PBS -N "nbody" のため)</code></pre>
 </div>
 
@@ -726,7 +726,7 @@ export OMP_PLACES=threads
 <div class="code-block">
   <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
 <pre><code>qsub run.miyabi.gpu.sh         # ジョブ投入
-qstat -u $USER                 # 状態確認</code></pre>
+qstat                          # 状態確認</code></pre>
 </div>
 
 <div class="note">
@@ -869,7 +869,7 @@ cmake -B build-miyabi-gpu -S . && cmake --build build-miyabi-gpu</code></pre>
 <tr><td><code>--extra-cflags</code></td><td>no</td><td>str</td><td>追加 compile flag (非 Kokkos のみ)</td></tr>
 <tr><td><code>--list</code></td><td>no</td><td>—</td><td>variant / machine 一覧</td></tr>
 <tr><td><code>--info</code></td><td>no</td><td>—</td><td>設定一覧 (3 階層)</td></tr>
-<tr><td><code>--group</code></td><td>no</td><td>str</td><td>ジョブスクリプトの課金グループ (PBS <code>group_list</code> / PJM <code>-g</code>)。省略時は <code>id -gn</code> で自動取得</td></tr>
+<tr><td><code>--group</code></td><td>no</td><td>str</td><td>ジョブスクリプトの課金グループ (PBS <code>group_list</code> / PJM <code>-g</code>)。省略時は machine yaml の <code>job.group_patterns</code> と <code>id -Gn</code> / <code>id -gn</code> で自動取得</td></tr>
 <tr><td><code>--kokkos-root</code></td><td>no</td><td>str</td><td>Kokkos の install prefix。省略時は machine yaml の <code>kokkos.root</code> を使い、それが placeholder のときだけ <code>Kokkos_ROOT</code>/<code>KOKKOS_ROOT</code>、<code>CMAKE_PREFIX_PATH</code>、<code>~/kokkos/*</code> 等から自動検出。見つからない場合は指定を促して終了</td></tr>
 <tr><td><code>--queue</code></td><td>no</td><td>str</td><td>ジョブスクリプトの投入キュー (PBS <code>-q</code> / PJM <code>-L rscgrp</code>)。省略時は machine yaml の <code>job.per_mode.&lt;mode&gt;.queue</code>。<code>scheduler: none</code> の machine (local) に渡すと ERROR</td></tr>
 <tr><td><code>--dry-run</code></td><td>no</td><td>—</td><td>ビルドファイルの生成内容を stdout 表示 (書き込まない)</td></tr>
@@ -976,12 +976,12 @@ cmake -B build-miyabi-gpu -S . && cmake --build build-miyabi-gpu</code></pre>
 <thead><tr><th>項目</th><th>値</th></tr></thead>
 <tbody>
 <tr><td>統合 CSV</td><td><code>summary/nbody.csv</code> (行数は計測を追記するたびに増えます)</td></tr>
-<tr><td>非 Kokkos 行</td><td>5243 (Miyabi/Wisteria 実機計測)</td></tr>
+<tr><td>非 Kokkos 行</td><td>3588 (Miyabi / Wisteria 実機計測)</td></tr>
 <tr><td>Kokkos 行</td><td>4200</td></tr>
 <tr><td>粒子数 N</td><td>1024 〜 4194304 を対数刻み</td></tr>
 <tr><td>machine</td><td>miyabi, wisteria</td></tr>
 <tr><td>精度</td><td><code>32 (FP_L=FP_M=32)</code> / <code>64 (FP_L=FP_M=64)</code> / <code>32_64 (FP_L=32, FP_M=64)</code> の 3 通り</td></tr>
-<tr><td>impl 種類</td><td>openmp-target, openacc, stdpar, do-concurrent, kokkos (5 種。openmp-cpu の計測行は未収録)</td></tr>
+<tr><td>impl 種類</td><td>openmp-cpu, openmp-target, openacc, stdpar, do-concurrent, kokkos (6 種)</td></tr>
 </tbody>
 </table>
 

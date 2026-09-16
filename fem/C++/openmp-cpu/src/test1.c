@@ -16,8 +16,8 @@ static inline double wall_time(void) {
     return (double)t.tv_sec + (double)t.tv_usec * 1.0e-6;
 }
 
-extern void INPUT_CNTL();
-extern void INPUT_GRID();
+extern void INPUT_CNTL( int argc, char *argv[] );
+extern void INPUT_GRID( int nxn );
 extern void MAT_CON0();
 extern void MAT_CON1();
 extern void MAT_ASS_MAIN();
@@ -41,9 +41,20 @@ int main(int argc, char *argv[])
     exit(1);
   }
 
+  if (argc < 2) {
+    fprintf(stderr, "ERROR: insufficient number of input parameters: %d (at least %d inputs are required)\n", argc, 2);
+    fprintf(stderr, "Usage is: %s N [ITER] [COND] [QVOL] [RESID]\n", argv[0]);
+    fprintf(stderr, "\tN    : number of nodes per edge (cubic: NX=NY=NZ=N) <int>\n");
+    fprintf(stderr, "\tITER : max iterations of CG solver (default 2000) <int>\n");
+    fprintf(stderr, "\tCOND : thermal conductivity (default 1.0) <float>\n");
+    fprintf(stderr, "\tQVOL : volumetric heat source (default 1.0) <float>\n");
+    fprintf(stderr, "\tRESID: convergence criterion (default 1.0e-08) <float>\n");
+    exit(1);
+  }
+
 /** INIT **/
-  INPUT_CNTL();
-  INPUT_GRID();
+  INPUT_CNTL( argc, argv );
+  INPUT_GRID( atoi(argv[1]) );
 
 /** matrix connectivity **/
   MAT_CON0();
@@ -78,7 +89,7 @@ int main(int argc, char *argv[])
     /* 10 列 CSV: openmp-cpu 旧コードは N (= NP に相当) を使用 */
     printf("# binary,NP,time_sec,performance_gflops,error,real_sec,user_sec,sys_sec,num_time_steps_logged,last_sim_time\n");
     printf("%s,%d,%13.6e,%13.6e,%13.6e,%13.6e,%13.6e,%13.6e,%d,%13.6e\n",
-           argv[0], N, solver_sec, perf_gflops, RESID,
+           argv[0], N, solver_sec, perf_gflops, RESIDactual,
            real_sec, user_sec, sys_sec, ITERactual, mat_sec);
   }
 #endif

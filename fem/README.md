@@ -55,10 +55,9 @@ cd C++/openacc/auto.def
 cmake -B build-local-gpu -S .
 cmake --build build-local-gpu
 
-# 4. 実行 (引数は INPUT.DAT のパス。mesh (cube.0) は CWD 相対で読まれる)
-#    variant ディレクトリは 3 階層なので input/ は ../../../ にある
-cp ../../../input/INPUT.DAT ../../../input/cube.0 .
-./build-local-gpu/fem.gpu.32 INPUT.DAT
+# 4. 実行 (引数 N = 1 辺あたりの節点数。65 なら 65^3 = 274625 節点)
+#    メッシュは実行時に内部生成されるので入力ファイルは不要
+./build-local-gpu/fem.gpu.32 65
 ```
 
 標準出力 (10 列 CSV):
@@ -83,10 +82,6 @@ fem/
 │   ├── miyabi.yaml                     # 東大 Miyabi (Intel CPU + NVHPC 24.5+/GH200, PBS Pro)
 │   ├── wisteria.yaml                   # 東大 Wisteria (GCC/FCCpx + NVHPC 24.1/A100, PJM)
 │   └── local.yaml                      # ローカル開発機 (バッチ無し、直接実行)
-├── input/                              # FEM 入力データ (fem 特有)
-│   ├── INPUT.DAT                       # 制御パラメータ (mesh, ITER, COND, RESID)
-│   ├── cube.0                          # 3D 立方体メッシュ (65^3 = 274625 節点)
-│   └── gen_cube.py                     # 別サイズの cube.N 生成 (例: gen_cube.py 33 cube.0)
 ├── C++/                                # C/C++ 実装
 │   ├── openmp-cpu/                     # OpenMP CPU ベースライン
 │   ├── openacc/{auto.def,auto.opt,manu.def,manu.opt}/
@@ -106,25 +101,40 @@ fem/
 └── summary/                            # 既測データ + 可視化
     ├── fem.csv                         # 統合 CSV (Kokkos + 非 Kokkos、18 列)
     ├── fem_dashboard.html              # インタラクティブ可視化
-    ├── parse_logs.py                   # 実行ログ → fem.csv 形式に変換
-    ├── parse_kokkos_logs.py            # Kokkos 実行ログ用
+    ├── parse_logs.py                   # 実行ログ (10 列 CSV) → fem.csv 形式 (18 列) に変換
     └── visualize.py                    # ダッシュボード生成器
 ```
 
 ---
 
-## fem 固有の入力 (INPUT.DAT)
+## fem 固有の引数 (問題サイズとソルバ設定)
+
+diffusion / nbody と同じく **入力ファイルを持たず、引数だけで問題が決まります**。
+立方体メッシュ (8 節点六面体 1 次要素) は実行時に内部生成されます。
 
 ```
-cube.0       # mesh ファイル名 (CWD 相対パス)
-2000         # CG 最大反復数 (ITER)
-1.0 1.0      # COND, QVOL (熱伝導率と熱源)
-1.0e-08      # 収束判定残差 (RESID)
+<binary> N [ITER] [COND] [QVOL] [RESID]
 ```
 
-実行時は `<binary> input/INPUT.DAT` のように **INPUT.DAT のパスを引数で指定**します。INPUT.DAT 内に書かれた mesh ファイル (`cube.0`) は **CWD 相対**で探されるため、バイナリと同じディレクトリにコピーするか symlink を張ってください。
+| 引数 | 意味 | 既定値 |
+|---|---|---|
+| **N** | **1 辺あたりの節点数** (立方体: NX=NY=NZ=N)。必須 | — |
+| ITER | CG 最大反復数 | 2000 |
+| COND | 熱伝導率 | 1.0 |
+| QVOL | 体積発熱 | 1.0 |
+| RESID | 収束判定残差 | 1.0e-08 |
 
-`cube.0` を別 mesh に差し替えれば、より大きな問題も解けます (現状は 65^3 = 274625 節点)。
+`N=65` なら 65^3 = 274625 節点 / 64^3 = 262144 要素で、これが既定の問題サイズです。
+`N` を変えるだけで任意サイズが解けます:
+
+```bash
+./build-miyabi-gpu/fem.gpu.32 33        # 33^3 = 35937 節点 (小さめ)
+./build-miyabi-gpu/fem.gpu.32 129       # 129^3 = 2146689 節点 (大きめ)
+./build-miyabi-gpu/fem.gpu.32 65 4000   # 反復数上限だけ変更
+```
+
+境界条件は Z=Zmax 面を Dirichlet 固定。節点グループ Xmin / Ymin / Zmin / Zmax が
+生成されますが、求解に使われるのは Zmax のみです。
 
 ---
 
@@ -186,23 +196,21 @@ make -f Makefile.gen.miyabi.gpu
 ### Step 3: 実行 (ジョブスクリプトを投入)
 
 `configure.py` が `run.miyabi.gpu.sh` を自動生成します。**入力のコピーと実行行は生成済みなので編集は不要**です
-(課金グループも `id -gn` の primary group が埋まります。違う場合は `--group` で指定)。生成される実行部:
+(課金グループも自動検出されて埋まります。違う場合は `--group` で指定)。生成される実行部:
 
 ```bash
-# === 実行 ===
-#   argv[1] は制御ファイル (INPUT.DAT)。メッシュファイル名 (cube.0) は
-#   INPUT.DAT の 1 行目に書かれており、カレントディレクトリから読まれる。
-#   そのため入力一式をカレントにコピーしてから実行する。
-INPUT_DIR=../../../input
-cp -f ${INPUT_DIR}/INPUT.DAT ${INPUT_DIR}/cube.0 .
-#   別サイズのメッシュを使う場合 (例: 33^3 節点):
-#     python3 ${INPUT_DIR}/gen_cube.py 33 cube.0
-./build-miyabi-gpu/fem.gpu.32 INPUT.DAT
+# === 実行 (N = 1 辺あたりの節点数; 65 → 65x65x65 = 274625 節点) ===
+#   立方体メッシュは実行時に内部生成されるので入力ファイルは不要。
+#   引数: N [ITER] [COND] [QVOL] [RESID]  (2 番目以降は省略可)
+#     ITER =CG 最大反復数 (既定 2000)  COND =熱伝導率 (既定 1.0)
+#     QVOL =体積発熱 (既定 1.0)        RESID=収束判定 (既定 1.0e-08)
+N=65
+./build-miyabi-gpu/fem.gpu.32 $N
 ```
 
 ```bash
 qsub run.miyabi.gpu.sh                 # ジョブ投入
-qstat -u $USER                         # 状態確認
+qstat                                  # 状態確認
 # 完了後、fem.o<jobid> に標準出力 (10 列 CSV) が出力される
 ```
 
@@ -211,28 +219,26 @@ qstat -u $USER                         # 状態確認
 | カラム | fem での意味 | 単位 |
 |---|---|---|
 | binary | 実行バイナリのパス | string |
-| **NP** | **節点数 (= DOF)、mesh で決まる (cube.0 = 274625)** | int |
+| **NP** | **節点数 (= DOF)、引数 N で決まる (N=65 なら 274625)** | int |
 | time_sec | CG ソルバ計算時間 | 秒 |
 | performance_gflops | 演算性能 (FLOP / solver_time) | GFLOPS |
-| **error** | **INPUT.DAT の RESID 設定値** (収束後の残差ではない。下の注意を参照) | float |
+| **error** | **RESID の設定値** (収束後の残差ではない。下の注意を参照) | float |
 | real_sec | プログラム全体の wall clock 時間 | 秒 |
 | user_sec | user CPU 時間 (Fortran は cpu_time() 代用) | 秒 |
 | sys_sec | sys CPU 時間 (Fortran は 0.0 固定) | 秒 |
-| **num_time_steps_logged** | **INPUT.DAT の最大反復数 ITER** (実反復数ではない。下の注意を参照) | int |
+| **num_time_steps_logged** | **最大反復数 ITER の設定値** (実反復数ではない。下の注意を参照) | int |
 | **last_sim_time** | **matrix assembly 時間** (fem 特有) | 秒 |
 
 太字は diffusion と意味が異なる箇所:
 - diffusion: `N` = 立方体 1 辺 (引数指定)、`error` = 解析解との L2 誤差、`num_time_steps_logged` = 時間積分ステップ数、`last_sim_time` = 最終 simulation 時刻
-- fem: `NP` = 全節点数、`error` = CG の収束判定値、`num_time_steps_logged` = CG 最大反復数、`last_sim_time` = matrix assembly 時間
+- fem: `NP` = 全節点数、`error` = **CG の到達残差**、`num_time_steps_logged` = **実反復回数**、`last_sim_time` = matrix assembly 時間
 
-> **注意 (`error` と `num_time_steps_logged`)**
-> `SOLVE11()` は `ITERactual = ITER` としていますが、`CG()` は `ITER` と `RESID` を値渡しで
-> 受け取るため、収束した反復数・残差は呼び出し元に戻りません。したがって CSV の
-> `error` は INPUT.DAT の収束判定値 (既定 `1.0e-08`)、`num_time_steps_logged` は
-> INPUT.DAT の最大反復数 (既定 `2000`) がそのまま出ます。
-> 実際の反復履歴が必要な場合は `BENCHMARK_MODE` を外してビルドしてください
-> (標準出力に `<反復数> <残差>` が 1 行ずつ出ます。同梱 `cube.0` + 既定設定なら
-> 197 反復・残差 8.292404e-09 で収束します)。
+> **`error` と `num_time_steps_logged` の読み方**
+> CG が到達した残差と実際に回した反復回数が入ります (C / Fortran / Kokkos 共通)。
+> `N=65` + 既定設定なら **197 反復・残差 8.292404e-09** で収束し、この値は
+> スレッド数や実行モード (CPU / GPU) によらず再現します。
+> 収束しなかった場合は `num_time_steps_logged` に最大反復数 +1 (既定なら 2001)、
+> `error` に打ち切り時の残差が出るので、CSV を見れば収束の成否が判別できます。
 
 
 CSV の列名・スキーマは diffusion と同一構造ですが、**ファイルとツールはアプリごとに独立**しています:
@@ -312,10 +318,10 @@ make -j install
 | オプション | 既定の挙動 |
 |---|---|
 | `--queue NAME` | 省略時は machine yaml の `job.per_mode.<mode>.queue`。講習会などで専用キューを使うときに指定します (例: `--queue tutorial-g`)。使えるキュー名は `--info --machine <name>` で一覧できます |
-| `--group NAME` | 省略時は `id -gn` で課金グループを自動取得。取得できない場合はジョブスクリプト先頭に警告を出し、投入前の編集を促します |
+| `--group NAME` | 省略時は machine yaml の `job.group_patterns` と `id -Gn` / `id -gn` で課金グループを自動取得。取得できない場合はジョブスクリプト先頭に警告を出し、投入前の編集を促します |
 | `--kokkos-root PATH` | 省略時は **machine yaml の `kokkos.root`** を使い、それが placeholder (`/xxx/` 等) のときだけ自動検出に回ります。自動検出は環境変数 `Kokkos_ROOT` / `KOKKOS_ROOT` → `CMAKE_PREFIX_PATH` → `~/kokkos/*`, `~/.local`, `/opt/kokkos*`, `/usr/local`, spack の順に探索し、`KokkosConfig.cmake` を持つ prefix を採用します。どれも見つからない場合は指定を促して終了します |
 
-`--group` は明示値が `id -gn` の検出値と異なる場合に警告を出したうえで、指定値を優先します。
+`--group` は明示値が自動検出値と異なる場合に警告を出したうえで、指定値を優先します。
 `--kokkos-root` は明示値に `KokkosConfig.cmake` が無いときに警告を出し、そのまま指定値を使います
 (machine yaml の `kokkos.root` に `KokkosConfig.cmake` が無い場合は、自動検出値へフォールバックして警告します)。
 
@@ -445,8 +451,7 @@ diff -ru C++/openacc/auto.def.exercise/src C++/openacc/auto.def/src
 | configure.py の生成物 | `CMakeLists.txt` (先頭に `Generated by configure.py` を含むものだけ)、`Makefile.gen.<machine>.<mode>`、`run.<machine>.<mode>.sh` |
 | ビルド生成物 | `build-<machine>-<mode>/`、`*.o`、`*.mod`、`mod/`、バイナリ (`fem.<mode>.<FP>...`) |
 | ジョブ出力ログ | `fem.o<jobid>` (PBS)、`fem.<jobid>.out` / `.err` (PJM) |
-| 実行時生成物 | `INPUT.DAT` / `cube.0` (run スクリプトが `input/` からコピーしたもの。原本は `input/` に残る) |
-| 実行結果 (`--allclean` のみ) | `test.inp` (`output_ucd`)、`log.log` (`test1`) |
+| 実行結果 (`--allclean` のみ) | `log.log` (`test1` が書く反復履歴)。`test.inp` (`output_ucd`) は現在どの variant も `OUTPUT_UCD()` を呼んでいないため生成されないが、有効化した場合に備えて削除対象に含めてある |
 
 ```bash
 # 削除対象の一覧だけ表示 (削除しない)
@@ -493,8 +498,30 @@ ERROR で終了します。
 | `--dry-run` | no | flag | ビルドファイルの生成内容を表示するだけで書き込まない |
 | `--dry-job` | no | flag | ジョブスクリプトの生成内容を表示するだけで書き込まない (`--dry-run` と併用で両方) |
 | `--clean` | no | flag | 生成物を削除 (実行結果と `results/` は残す)。`--dry-run` で一覧のみ、`--yes` で確認省略、`--variant`/`--machine`/`--mode` で対象を絞る |
-| `--allclean` | no | flag | `--clean` に加えて実行結果の出力ファイル (`test.inp`, `log.log`) も削除 (`results/` は残す) |
+| `--allclean` | no | flag | `--clean` に加えて実行結果の出力ファイル (`log.log`、および有効化時の `test.inp`) も削除 (`results/` は残す) |
 | `--yes`, `-y` | no | flag | `--clean` / `--allclean` の確認プロンプトを省略 (非対話環境では必須) |
+
+---
+
+## impl と mode の対応
+
+`--mode` は実装ごとに使える値が決まっており、`configure.py` は対応しない組み合わせを
+ERROR で拒否します。これは教材としての役割分担を反映したものです。
+
+| impl | 使える mode | 役割 |
+|---|---|---|
+| `openmp-cpu` | `cpu` | **CPU ベースライン**。GPU 版と比較する基準 |
+| `openmp-target` / `openacc` | `gpu` / `uni` | ディレクティブで GPU 化する手段 |
+| `stdpar` / `do-concurrent` | `gpu` / `uni` | 言語標準で GPU 化する手段 |
+| `kokkos` | `gpu` / `cpu` | **同一ソースが CPU でも GPU でも動く** portability の実演 |
+
+`openmp-target` / `openacc` / `stdpar` / `do-concurrent` に `cpu` モードが無いのは、
+これらが **GPU 化のための記述方法**であり、CPU 実行の比較対象は `openmp-cpu` に
+一本化しているためです。`kokkos` だけ `cpu` を持つのは、backend を差し替えるだけで
+同じコードが CPU でも動くこと自体が Kokkos の主題だからです。
+
+`uni` (unified memory) は `gpu` の派生で、Miyabi のみ利用できます
+(NVHPC 24.1 の Wisteria は `mem:unified` 非対応)。
 
 ---
 
@@ -525,21 +552,9 @@ ERROR で終了します。
 
 ---
 
-## fem 固有の既知の修正点 (mizuho 由来コードからの変更)
-
-| ファイル | 修正内容 | 理由 |
-|---|---|---|
-| `F/*/src/pfem_fem_util.f` | `use pfem_util` のみとし、配列再宣言を削除 | NVHPC は use-associated symbol の再宣言を許可しない |
-| `F/*/src/mat_ass_init.f` | `use pfem_all` → `use pfem_util + use pfem_fem_util` | `pfem_all` モジュールは存在しない (旧コードのタイポ?) |
-| `C++/{openacc,openmp-target}/*/src/solver_CG.c` | CG 関数末尾に `ITERactual = ITER;` を追加 | CG パラメータの `ITER` がローカル shadow になり global ITERactual に反映されないため |
-| `F/*/src/solver_CG.f` | 同上 (Fortran 版) | 同上 |
-| `C++/*/src/test1.c`, `F/*/src/test1.f` | BENCHMARK_MODE 時の出力を 10 列 CSV に変更 | diffusion と統一スキーマ。`real_sec`/`user_sec`/`sys_sec`/`ITERactual`/`mat_sec` を出力 |
-
----
-
 ## 性能評価 (ダッシュボード)
 
-`summary/visualize.py` が `summary/fem.csv` (18 列、現在 455 行) を読み込んでインタラクティブ
+`summary/visualize.py` が `summary/fem.csv` (18 列、現在 707 行) を読み込んでインタラクティブ
 ダッシュボードを生成します。`category` カラムは `Kokkos` / `non-Kokkos` の区別で、CSV とツールは
 アプリごとに独立しています (アプリ横断の統合 CSV はありません):
 
@@ -555,9 +570,57 @@ python3 visualize.py
 フィルタからは外し、色分け軸としてのみ残しています)。fem は mesh で問題サイズが決まるため
 `nx/ny/nz` 列は持たず、`N` (= NP) のみです。
 
+### 計測結果を fem.csv に取り込む
+
+Kokkos も非 Kokkos も同じ 10 列 CSV を標準出力するので、ジョブ出力を
+`results/<machine>/` に置いて `parse_logs.py` に渡すだけで 18 列に変換できます
+(バイナリパスから machine / mode / impl / variant / memory_model / fp を自動推論):
+
+```bash
+cd fem
+# ジョブスクリプト内で: <binary> <N> >> results/miyabi/kokkos-range-baseline.log
+python3 summary/parse_logs.py --input results/miyabi --output results/miyabi/summary.csv
+python3 summary/parse_logs.py --input results/miyabi --append summary/fem.csv   # 直接追記
+```
+
+> バイナリは `build-<machine>-<mode>/` 以下から**絶対パスで**起動してください。
+> `parse_logs.py` はそのパスからメタ情報を推論するため、`./build-…` のような
+> 相対パスだと machine / impl / variant が空欄になります。
+
+### 既測データの概要
+
+| 項目 | 値 |
+|---|---|
+| 統合 CSV | `summary/fem.csv` (行数は計測を追記するたびに増えます) |
+| 非 Kokkos 行 | 343 (Miyabi / Wisteria 実機計測) |
+| Kokkos 行 | 364 (Miyabi: 12 variant × FP32/64 × 4 サイズ × 3 回 + 既存分、Wisteria: 4 variant × FP64 × 4 サイズ) |
+| 問題サイズ NP | 4913 (17³) / 35937 (33³) / 274625 (65³) / 2146689 (129³) |
+| machine | miyabi, wisteria |
+| 精度 | FP=32 / FP=64 (Kokkos の Wisteria 行は FP=64 のみ) |
+| impl 種類 | openmp-cpu, openmp-target, openacc, stdpar, do-concurrent, kokkos (6 種) |
+
+> **注意**: `error` 列の意味が category で異なります。Kokkos 行は CG の最終残差、
+> 非 Kokkos 行は原点節点の解の値 (一部は `RESID` の設定値) が入っています。
+> 精度比較に使う際は `category` で絞り込んでください。
+
+### ダッシュボードの典型的な使い方
+
+| 観察したいこと | 操作 |
+|---|---|
+| 「全 impl の性能スケーリング (NP→GFLOPS)」 | X=N (log), Y=performance_gflops (log), 色=impl |
+| 「Miyabi と Wisteria の比較」 | filter=impl:kokkos + variant:range/baseline、X=N (log)、Y=performance_gflops、色=machine |
+| 「Kokkos の policy 比較 (range/mdrange/team)」 | filter=impl:kokkos + optimization_type:baseline、X=N、Y=performance_gflops、色=variant |
+| 「UVM のオーバーヘッド」 | filter=impl:kokkos、X=N、Y=performance_gflops、色=memory_model |
+| 「auto.def vs manu.def のメモリモデル効果」 | filter=variant:{auto.def, manu.def}、X=N、Y=performance_gflops、色=memory_model |
+
 ---
 
 ## 詳しく知りたい人向け
+
+このドキュメントは **現在の実装がどうなっているか** だけを説明しています。
+元コードからの変更点、計測データの由来、既知のデータ品質の問題は
+[../HISTORY.md](../HISTORY.md) にまとめてあります。
+
 
 - diffusion アプリの README (`diffusion/README.md`) と相補的: 同じ configure.py / 同じ yaml 仕様 / 同じ CSV 形式 で 2 アプリを比較できます
 - 各 impl の固有事情は `diffusion/<lang>/<impl>/README.md` 等を参照。fem 側は Kokkos のみ

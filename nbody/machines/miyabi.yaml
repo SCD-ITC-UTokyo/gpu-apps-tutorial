@@ -43,8 +43,14 @@ gpu:
 job:
   scheduler: pbs
   submit_cmd: qsub
-  status_cmd: "qstat -u $USER"
+  # Miyabi の qstat は -u オプションを受け付けない (自分のジョブのみが出る)
+  status_cmd: qstat
   default_group: xxx
+  # default_group が placeholder のときの課金グループ自動検出パターン (fnmatch)。
+  # `id -Gn` の所属グループを上から順に照合し、最初に一致したものを採用する。
+  # Miyabi では primary group がユーザ名と同名のユーザ専用グループなので
+  # `id -gn` では課金グループ (grXX 等) が取れず、この照合が必要。
+  group_patterns: ["g[a-z][0-9]*", "jh[0-9]*"]
   default_walltime: "00:10:00"
   # mode → キュー & スレッド数 (Miyabi-G: GH200, Miyabi-C: Intel SPR)
   # modules は configure.py が自動 module load することはなく、
@@ -60,5 +66,11 @@ job:
 
 # Kokkos (要記入: 実機の spack install 先パス)
 kokkos:
-  root: /xxx/kokkos/5.0.2/
+  # 要記入: 実機の Kokkos install 先 (KokkosConfig.cmake を含む prefix)。
+  # 未記入なら configure.py が環境変数 Kokkos_ROOT や ~/kokkos/* 等から自動検出し、
+  # それも失敗したら --kokkos-root での明示指定を促す。
+  # 注意: cxx_standard は Kokkos 本体の要求と揃える必要がある。
+  #       Kokkos 4.x = C++17、Kokkos 5.x = C++20 必須 (5.x を使うなら 20 に変更)。
+  #       Miyabi (GH200) では 4.7.02 を CUDA(sm_90)+OpenMP backend でビルドして動作確認済み。
+  root: /xxx/kokkos/4.7.02/
   cxx_standard: 17

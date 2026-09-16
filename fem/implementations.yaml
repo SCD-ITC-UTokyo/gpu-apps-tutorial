@@ -36,7 +36,8 @@ implementations:
     # variant パス: <policy>/<sub>
     #   policy = range | mdrange | team
     #   sub    = baseline | cpu-{sweep|tile-sweep|chunk-sweep} | uvm | uvm-{sweep|tile-sweep|chunk-sweep}
-    #            | baseline-fused | uvm-fused (range のみ)
+    #   (diffusion にはこれに加えて range/baseline-fused・range/uvm-fused があるが、
+    #    このアプリには実装が無い。利用可能な variant は ./configure.py --list を参照)
     # マクロ既定値 (sweep variant が要求するマクロ):
     macros_default:
       "_NX": 2                          # mdrange tile size
