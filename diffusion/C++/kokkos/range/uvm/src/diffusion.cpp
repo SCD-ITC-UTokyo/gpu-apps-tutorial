@@ -2,19 +2,20 @@
 
 #include <stdio.h>
 #include <math.h>
+#include "misc.h"
 #include <Kokkos_Core.hpp>
 
-double diffusion3d(int nx, int ny, int nz, int mgn, float dx, float dy, float dz, float dt, float kappa,
-                   Kokkos::View<float*, Kokkos::CudaUVMSpace> f, Kokkos::View<float*, Kokkos::CudaUVMSpace> fn)
+double diffusion3d(int nx, int ny, int nz, int mgn, flt dx, flt dy, flt dz, flt dt, flt kappa,
+                   Kokkos::View<flt*, Kokkos::CudaUVMSpace> f, Kokkos::View<flt*, Kokkos::CudaUVMSpace> fn)
 {
-    const float ce = kappa * dt / (dx * dx);
-    const float cw = ce;
-    const float cn = kappa * dt / (dy * dy);
-    const float cs = cn;
-    const float ct = kappa * dt / (dz * dz);
-    const float cb = ct;
+    const flt ce = kappa * dt / (dx * dx);
+    const flt cw = ce;
+    const flt cn = kappa * dt / (dy * dy);
+    const flt cs = cn;
+    const flt ct = kappa * dt / (dz * dz);
+    const flt cb = ct;
 
-    const float cc = 1.0F - (ce + cw + cn + cs + ct + cb);
+    const flt cc = 1.0F - (ce + cw + cn + cs + ct + cb);
 
     Kokkos::parallel_for("diffusion3d", nz,
       KOKKOS_LAMBDA(const int k) { 
@@ -39,11 +40,11 @@ double diffusion3d(int nx, int ny, int nz, int mgn, float dx, float dy, float dz
 }
 
 
-void init(int nx, int ny, int nz, int mgn, float dx, float dy, float dz, Kokkos::View<float*, Kokkos::CudaUVMSpace> f)
+void init(int nx, int ny, int nz, int mgn, flt dx, flt dy, flt dz, Kokkos::View<flt*, Kokkos::CudaUVMSpace> f)
 {
-    const float kx = 2.0F * (float)M_PI;
-    const float ky = kx;
-    const float kz = kx;
+    const flt kx = 2.0F * (flt)M_PI;
+    const flt ky = kx;
+    const flt kz = kx;
 
     Kokkos::parallel_for("init", nz+mgn-(-mgn),
       KOKKOS_LAMBDA(const int kk) {
@@ -51,9 +52,9 @@ void init(int nx, int ny, int nz, int mgn, float dx, float dy, float dz, Kokkos:
         for(int j = 0; j < ny; j++) {
             for(int i = 0; i < nx; i++) {
                 const int ix = nx * ny * (k + mgn) + nx * j + i;
-                const float x = dx * ((float)i + 0.5F);
-                const float y = dy * ((float)j + 0.5F);
-                const float z = dz * ((float)k + 0.5F);
+                const flt x = dx * ((flt)i + 0.5F);
+                const flt y = dy * ((flt)j + 0.5F);
+                const flt z = dz * ((flt)k + 0.5F);
 
                 f(ix) = 0.125F * (1.0F - cosf(kx * x)) * (1.0F - cosf(ky * y)) * (1.0F - cosf(kz * z));
             }
@@ -63,15 +64,15 @@ void init(int nx, int ny, int nz, int mgn, float dx, float dy, float dz, Kokkos:
     Kokkos::fence();
 }
 
-double err(double time, int nx, int ny, int nz, int mgn, float dx, float dy, float dz, float kappa, Kokkos::View<float*, Kokkos::CudaUVMSpace> f)
+double err(double time, int nx, int ny, int nz, int mgn, flt dx, flt dy, flt dz, flt kappa, Kokkos::View<flt*, Kokkos::CudaUVMSpace> f)
 {
-    const float kx = 2.0F * (float)M_PI;
-    const float ky = kx;
-    const float kz = kx;
+    const flt kx = 2.0F * (flt)M_PI;
+    const flt ky = kx;
+    const flt kz = kx;
 
-    const float ax = expf(-kappa * (float)time * (kx * kx));
-    const float ay = expf(-kappa * (float)time * (ky * ky));
-    const float az = expf(-kappa * (float)time * (kz * kz));
+    const flt ax = expf(-kappa * (flt)time * (kx * kx));
+    const flt ay = expf(-kappa * (flt)time * (ky * ky));
+    const flt az = expf(-kappa * (flt)time * (kz * kz));
 
     double ferr = 0.0;
 
@@ -80,11 +81,11 @@ double err(double time, int nx, int ny, int nz, int mgn, float dx, float dy, flo
         for(int j = 0; j < ny; j++) {
             for(int i = 0; i < nx; i++) {
                 const int ix = nx * ny * (k + mgn) + nx * j + i;
-                const float x = dx * ((float)i + 0.5F);
-                const float y = dy * ((float)j + 0.5F);
-                const float z = dz * ((float)k + 0.5F);
+                const flt x = dx * ((flt)i + 0.5F);
+                const flt y = dy * ((flt)j + 0.5F);
+                const flt z = dz * ((flt)k + 0.5F);
 
-                const float f0 = 0.125F * (1.0F - ax * cosf(kx * x)) * (1.0F - ay * cosf(ky * y)) * (1.0F - az * cosf(kz * z));
+                const flt f0 = 0.125F * (1.0F - ax * cosf(kx * x)) * (1.0F - ay * cosf(ky * y)) * (1.0F - az * cosf(kz * z));
 
                 const double diff = (double)f(ix) - (double)f0;
                 fsum += diff * diff;

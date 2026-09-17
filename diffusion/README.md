@@ -512,8 +512,11 @@ CMake 段で上書きする方法も可能 (`cmake -B build -S . -D_NX=4 -D_NY=8
 # 例: ローカル機の GPU で OpenMP target をビルド (CMake、default)
 ./configure.py --variant C++/openmp-target/auto.def --machine local --mode gpu
 
-# 例: Wisteria CPU で Fortran OpenMP CPU をビルド (GCC を明示、Make 指定)
-./configure.py --variant F/openmp-cpu --machine wisteria --mode cpu --compiler gcc --build make
+# 例: Wisteria CPU で Fortran OpenMP CPU をビルド (Make 指定)
+#     Wisteria の CPU は Odyssey = A64FX (aarch64) なので、x86 のログインノードからは
+#     Fujitsu クロスコンパイラ (module load fj → frtpx / FCCpx) でビルドする。
+#     --compiler を省略しても machine yaml の既定 (C/C++=fccpx, Fortran=frtpx) が使われる
+./configure.py --variant F/openmp-cpu --machine wisteria --mode cpu --compiler frtpx --build make
 
 # 例: Miyabi で C++ stdpar の GPU unified memory ビルド
 ./configure.py --variant C++/stdpar/auto.def --machine miyabi --mode uni

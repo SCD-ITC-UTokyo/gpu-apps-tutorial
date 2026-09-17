@@ -123,6 +123,23 @@ def is_placeholder_group(g: str) -> bool:
     return g.lower() in ("xxx", "xxx", "none", "")
 
 
+def kokkos_enabled_backends(prefix: str) -> List[str]:
+    """Kokkos install の KokkosCore_config.h から有効な backend を読む。
+
+    GPU backend (CUDA/HIP/SYCL) の有無を --mode と突き合わせるために使う。
+    判定できない (ファイルが無い) ときは空リストを返し、呼び出し側は検査をスキップする。
+    """
+    cfg_h = Path(prefix) / "include" / "KokkosCore_config.h"
+    if not cfg_h.is_file():
+        return []
+    try:
+        txt = cfg_h.read_text(errors="ignore")
+    except OSError:
+        return []
+    return [b for b in ("CUDA", "HIP", "SYCL", "OPENMP", "THREADS", "SERIAL")
+            if re.search(r"^#define KOKKOS_ENABLE_%s\b" % b, txt, re.M)]
+
+
 def is_kokkos_install(prefix: str) -> bool:
     """その prefix が Kokkos の install 先か (KokkosConfig.cmake があるか) を判定。"""
     if not prefix:
@@ -368,7 +385,11 @@ def resolve_cpu_compiler(machine: dict, machine_name: str, requested: Optional[s
     if not compilers:
         fail(f"machine '{machine_name}' に CPU compiler 定義が無い")
 
+    # 既定コンパイラは言語別に指定できる (cpu.default / cpu.default_f90)。
+    # 例: Wisteria の Odyssey は C/C++ = fccpx、Fortran = frtpx (fccpx に f90 が無い)。
     default = cpu_block.get("default")
+    if lang == "f90" and cpu_block.get("default_f90"):
+        default = cpu_block["default_f90"]
     name = requested or default
     if name not in compilers:
         avail = list(compilers.keys())
@@ -568,7 +589,11 @@ def resolve_build_config(args, app, impls, machine, machine_name) -> dict:
         #   2. machine yaml の kokkos.root (placeholder でなければ)
         #   3. 自動検出 (環境変数 Kokkos_ROOT / CMAKE_PREFIX_PATH / よくある install 先)
         #   4. どれも駄目なら --kokkos-root を指定するよう促して終了
-        yaml_kokkos_root = kokkos_block.get("root", "")
+        # mode ごとに Kokkos install を分けられる (kokkos.root_per_mode.<mode>)。
+        # 例: Wisteria は GPU=Aquarius(x86+A100) / CPU=Odyssey(A64FX) でアーキが違うため、
+        #     同じ Kokkos install を使い回せない。無ければ従来どおり kokkos.root を見る。
+        yaml_kokkos_root = ((kokkos_block.get("root_per_mode") or {}).get(args.mode)
+                            or kokkos_block.get("root", ""))
         cli_kokkos_root = getattr(args, "kokkos_root", None)
         kr_is_placeholder = is_placeholder_kokkos_root(yaml_kokkos_root)
         kokkos_root_unresolved = False
@@ -601,6 +626,22 @@ def resolve_build_config(args, app, impls, machine, machine_name) -> dict:
                      % (args.variant, machine_name, args.mode))
             kokkos_root = detected
             kokkos_root_source = "auto"
+        # backend と --mode の整合性を検査する。
+        # (Kokkos の実行空間は install 時に決まるため、GPU backend を持たない install で
+        #  --mode gpu をビルドすると「GPU のつもりで CPU 実行」になってしまう)
+        backends = kokkos_enabled_backends(kokkos_root)
+        gpu_backends = [b for b in backends if b in ("CUDA", "HIP", "SYCL")]
+        if backends and args.mode in ("gpu", "uni") and not gpu_backends:
+            fail(f"Kokkos install '{kokkos_root}' は GPU backend を持ちません "
+                 f"(有効な backend: {backends})。--mode {args.mode} には CUDA/HIP/SYCL backend "
+                 f"付きの Kokkos が必要です。\n"
+                 f"       --kokkos-root で GPU 用 install を指定するか、machine yaml の "
+                 f"kokkos.root_per_mode.{args.mode} に記入してください。")
+        if backends and args.mode == "cpu" and gpu_backends:
+            print(f"  [WARN] Kokkos install '{kokkos_root}' は GPU backend {gpu_backends} を含むため、"
+                  f"--mode cpu でも DefaultExecutionSpace は GPU になります。"
+                  f"CPU 実行を測るなら OpenMP backend のみの install を "
+                  f"kokkos.root_per_mode.cpu か --kokkos-root で指定してください。")
         cxx_standard = kokkos_block.get("cxx_standard", 17)
 
         policy = variant_key   # range / mdrange / team
@@ -825,6 +866,15 @@ def generate_job_script(cfg: dict, args, machine: dict, machine_name: str,
     # 環境設定 (module load 等) はユーザ責務 — ビルド env と実行 env を揃えるため、
     # configure.py は推奨例をコメントとしてのみ提供し、自動でロードはしない。
     module_examples = list(per_mode.get("modules", []))
+    # Kokkos variant は Kokkos をビルドした環境で実行しないと、共有ライブラリ
+    # (libstdc++ の GLIBCXX 等) が合わず起動時に失敗する。machine yaml に Kokkos 用の
+    # module が書いてあればそちらを推奨例にする。
+    if cfg.get("is_kokkos"):
+        kblock = machine.get("kokkos") or {}
+        kmods = ((kblock.get("modules_per_mode") or {}).get(mode)
+                 or kblock.get("modules") or [])
+        if kmods:
+            module_examples = list(kmods)
 
     # group_list 解決順:
     #   1. --group CLI で明示指定された値があればそれを使用

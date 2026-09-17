@@ -19,10 +19,10 @@ void  CG  (
            View1D<KREAL> &B, View1D<KREAL> &X, KREAL RESID, KINT ITER, KINT *ERROR)
 {
   int ieL,isL,ieU,isU;
-  double BNRM20,BNRM2,DNRM20,DNRM2;
+  KREAL  BNRM20,BNRM2,DNRM20,DNRM2;   /* 非 Kokkos 実装と同じく KREAL (FP で切り替わる) */
   double S1_TIME,E1_TIME;
-  double ALPHA,BETA;
-  double C1,C10,RHO,RHO0,RHO1;
+  KREAL  ALPHA,BETA;
+  KREAL  C1,C10,RHO,RHO0,RHO1;
   int    iterPRE;
   
   KINT R=0,Z=1,Q=1,P=2,DD=3;

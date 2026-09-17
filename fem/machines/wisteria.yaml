@@ -6,7 +6,14 @@ modes: [gpu, cpu]   # uni 非対応 (NVHPC 24.1 では mem:unified が無い)
 host_patterns: ["wisteria*", "w[oa]*"]
 
 cpu:
-  default: gcc
+  # Odyssey (A64FX = aarch64) 向け。ログインノードは x86_64 なので、
+  # そこで使える gcc/gfortran は x86 バイナリを作ってしまい debug-o で実行できない
+  # (aarch64 版 gcc は /work/opt/local/aarch64/cores にあるが計算ノード上でしか動かない)。
+  # そのため既定は Fujitsu クロスコンパイラ (module load fj) にする。
+  #   C/C++   : fccpx / FCCpx
+  #   Fortran : frtpx  (fccpx は f90 を持たないため default_f90 で分ける)
+  default: fccpx
+  default_f90: frtpx
   compilers:
     gcc:
       cc:  { cmd: gcc,      flags: [] }
@@ -57,8 +64,10 @@ job:
   # modules はジョブスクリプト生成時に「推奨例」コメントとして出るのみ。自動 load されない。
   # 実際の module load はユーザがビルド env と合わせて手動で行う。
   per_mode:
-    gpu: { queue: debug-a, omp_threads: 72, modules: ["nvidia"] }
-    cpu: { queue: debug-o, omp_threads: 48, modules: ["gcc/12.2.0"] }
+    # modules はバージョンまで固定する (module load nvidia だけだと default の
+    # nvidia/23.3 が入り、ビルド env (24.1) と実行 env がずれる)
+    gpu: { queue: debug-a, omp_threads: 72, modules: ["nvidia/24.1"] }
+    cpu: { queue: debug-o, omp_threads: 48, modules: ["fj"] }
   env:
     - "OMP_PROC_BIND=spread"
     - "OMP_PLACES=threads"
@@ -71,4 +80,17 @@ kokkos:
   #       Kokkos 4.x = C++17、Kokkos 5.x = C++20 必須 (5.x を使うなら 20 に変更)。
   #       Miyabi (GH200) では 4.7.02 を CUDA(sm_90)+OpenMP backend でビルドして動作確認済み。
   root: /xxx/kokkos/4.7.02/
+  # Wisteria は mode でアーキが変わる (GPU=Aquarius: x86_64+A100 / CPU=Odyssey: A64FX)。
+  # Kokkos の実行空間は install 時に決まるので、install も mode ごとに分ける必要がある。
+  # ここに書けば configure.py が mode に応じて使い分ける (未記入なら上の root → 自動検出)。
+  #   gpu: CUDA backend (KOKKOS_ARCH_AMPERE80) を有効にした install
+  #   cpu: OpenMP backend のみ + KOKKOS_ARCH_A64FX の install (FCCpx -Nclang でクロスビルド)
+  root_per_mode:
+    gpu: /xxx/kokkos/4.7.02
+    cpu: /xxx/kokkos/4.7.02-a64fx
+  # Kokkos をビルドした module 環境。生成ジョブスクリプトの「環境設定」推奨例に使う。
+  # (Kokkos バイナリを nvidia module だけで起動すると GLIBCXX が合わず落ちる)
+  modules_per_mode:
+    gpu: ["gcc/12.2.0", "cuda/12.2"]
+    cpu: ["fj"]
   cxx_standard: 17

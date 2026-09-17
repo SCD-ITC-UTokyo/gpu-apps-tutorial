@@ -834,10 +834,14 @@ cmake -B build-miyabi-gpu -S . && cmake --build build-miyabi-gpu</code></pre>
 <pre><code>./configure.py --variant C++/openmp-target/auto.def --machine local --mode gpu</code></pre>
 </div>
 
-<p><strong>例: Wisteria CPU で Fortran OpenMP CPU をビルド</strong> &nbsp;<span style="color:var(--muted);font-size:0.85em;">(GCC を明示、Make 指定)</span></p>
+<p><strong>例: Wisteria CPU で Fortran OpenMP CPU をビルド</strong> &nbsp;<span style="color:var(--muted);font-size:0.85em;">(Make 指定。Wisteria CPU は A64FX なので Fujitsu コンパイラ)</span></p>
 <div class="code-block">
   <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
-<pre><code>./configure.py --variant F/openmp-cpu --machine wisteria --mode cpu --compiler gcc --build make</code></pre>
+<pre><code>./configure.py --variant F/openmp-cpu --machine wisteria --mode cpu --compiler frtpx --build make</code></pre>
+<p>Wisteria の CPU は Odyssey = A64FX (aarch64) です。x86_64 のログインノードで使える gcc/gfortran は
+x86 バイナリを作ってしまい <code>rscgrp=debug-o</code> では実行できないため、Fujitsu クロスコンパイラ
+(<code>module load fj</code> → <code>FCCpx</code> / <code>frtpx</code>) を使います。
+<code>--compiler</code> を省略しても machine yaml の既定 (C/C++ = <code>fccpx</code>、Fortran = <code>frtpx</code>) が選ばれます。</p>
 </div>
 
 <p><strong>例: Miyabi で C++ stdpar の GPU unified memory ビルド</strong></p>

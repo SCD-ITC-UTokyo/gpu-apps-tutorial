@@ -14,8 +14,20 @@
 #ifndef MISC_H
 #define MISC_H
 
+/* 浮動小数精度は cmake -DFP=32/64 で切り替える (非 Kokkos 実装と同じ方式)。
+   これが無いと FP マクロが無視され、常に単精度で計算される。 */
+#if    FP == 32
+typedef float       flt;
+#elif  FP == 64
+typedef double      flt;
+#elif  FP == 128
+typedef long double flt;
+#else
+typedef float       flt;
+#endif
 
-void swap(float **f, float **fn);
+
+void swap(flt **f, flt **fn);
 void start_timer();
 double get_elapsed_time();
 

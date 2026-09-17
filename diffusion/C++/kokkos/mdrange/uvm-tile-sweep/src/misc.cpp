@@ -19,9 +19,9 @@ static time_t sec_org = 0;
 static time_t usec_org = 0;
 
 
-void swap(float **f, float **fn)
+void swap(flt **f, flt **fn)
 {
-    float *tmp;
+    flt *tmp;
     tmp = *f;
     *f = *fn;
     *fn = tmp;

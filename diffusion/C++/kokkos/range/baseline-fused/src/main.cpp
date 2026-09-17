@@ -35,16 +35,16 @@ int main(int argc, char *argv[])
     const int lnz = nz + 2 * mgn;
     const int ln  = lnx * lny * lnz;
 
-    const float lx = 1.0F;
-    const float ly = 1.0F;
-    const float lz = 1.0F;
+    const flt lx = 1.0F;
+    const flt ly = 1.0F;
+    const flt lz = 1.0F;
 
-    const float dx = lx / (float)nx;
-    const float dy = ly / (float)ny;
-    const float dz = lz / (float)nz;
+    const flt dx = lx / (flt)nx;
+    const flt dy = ly / (flt)ny;
+    const flt dz = lz / (flt)nz;
 
-    const float kappa = 0.1F;
-    const float dt    = 0.1F * fminf(fminf(dx * dx, dy * dy), dz * dz) / kappa;
+    const flt kappa = 0.1F;
+    const flt dt    = 0.1F * fminf(fminf(dx * dx, dy * dy), dz * dz) / kappa;
 
 #ifndef BENCHMARK_MODE
     const int nt = 100000;
@@ -57,8 +57,8 @@ int main(int argc, char *argv[])
     double elapsed_time = 0.0;
     Kokkos::ScopeGuard guard(argc, argv);
 
-    Kokkos::View<float*> f("f", ln);
-    Kokkos::View<float*> fn("fn", ln);
+    Kokkos::View<flt*> f("f", ln);
+    Kokkos::View<flt*> fn("fn", ln);
 
     init(nx, ny, nz, mgn, dx, dy, dz, f);
 

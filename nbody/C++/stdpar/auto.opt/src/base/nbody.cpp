@@ -51,7 +51,7 @@ constexpr type::flt_acc newton = AS_FLT_ACC(1.0);  // gravitational constant
 static inline void calc_acc(const type::int_idx Ni, const type::position *const ipos, type::acceleration *__restrict iacc, const type::int_idx Nj, const type::position *const jpos, const type::flt_pos eps2) {
 
   std::for_each_n
-  ( std::execution::par, util::counting_iterator<int32_t>(0), Ni, [&](int i)
+  ( std::execution::par, util::counting_iterator<int32_t>(0), Ni, [=](int i)
   {
     // initialization
     const auto pi = ipos[i];
@@ -101,7 +101,7 @@ static inline void trim_acc(const type::int_idx Ni, type::acceleration *__restri
 #endif  // CALCULATE_POTENTIAL
 ) {
   std::for_each_n
-  ( std::execution::par, util::counting_iterator<int32_t>(0), Ni, [&](int i)
+  ( std::execution::par, util::counting_iterator<int32_t>(0), Ni, [=](int i)
   {
     // initialization
     auto ai = acc[i];
@@ -128,7 +128,7 @@ static inline void trim_acc(const type::int_idx Ni, type::acceleration *__restri
 ///
 static inline void kick(const type::int_idx num, type::velocity *__restrict vel, const type::acceleration *const acc, const type::flt_vel dt) {
   std::for_each_n
-  ( std::execution::par, util::counting_iterator<int32_t>(0), num, [&](int i)
+  ( std::execution::par, util::counting_iterator<int32_t>(0), num, [=](int i)
   {
     // initialization
     auto vi = vel[i];
@@ -152,7 +152,7 @@ static inline void kick(const type::int_idx num, type::velocity *__restrict vel,
 ///
 static inline void drift(const type::int_idx num, type::position *__restrict pos, const type::velocity *const vel, const type::flt_pos dt) {
   std::for_each_n
-  ( std::execution::par, util::counting_iterator<int32_t>(0), num, [&](int i)
+  ( std::execution::par, util::counting_iterator<int32_t>(0), num, [=](int i)
   {
     // initialization
     auto pi = pos[i];
@@ -178,7 +178,7 @@ static inline void drift(const type::int_idx num, type::position *__restrict pos
 static inline void kick_backward_half(const type::int_idx num, const type::velocity *const vel_src, const type::acceleration *const acc, type::velocity *__restrict vel, const type::flt_vel dt) {
   const auto dt_2 = AS_FLT_VEL(0.5) * dt;
   std::for_each_n
-  ( std::execution::par, util::counting_iterator<int32_t>(0), num, [&](int i)
+  ( std::execution::par, util::counting_iterator<int32_t>(0), num, [=](int i)
   {
     // initialization
     auto vi = vel_src[i];

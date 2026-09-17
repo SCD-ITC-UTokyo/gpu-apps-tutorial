@@ -426,8 +426,11 @@ diff -ru C++/openacc/auto.def.exercise/src C++/openacc/auto.def/src
 # 例: ローカル機の GPU で OpenACC をビルド
 ./configure.py --variant C++/openacc/auto.def --machine local --mode gpu
 
-# 例: Wisteria CPU で Fortran OpenMP CPU をビルド (GCC 明示、Make 指定)
-./configure.py --variant F/openmp-cpu --machine wisteria --mode cpu --compiler gcc --build make
+# 例: Wisteria CPU で Fortran OpenMP CPU をビルド (Make 指定)
+#     Wisteria の CPU は Odyssey = A64FX (aarch64)。x86 のログインノードからは
+#     Fujitsu クロスコンパイラ (module load fj → frtpx / FCCpx) でビルドする
+#     (--compiler 省略時も machine yaml の既定 C/C++=fccpx, Fortran=frtpx が使われる)
+./configure.py --variant F/openmp-cpu --machine wisteria --mode cpu --compiler frtpx --build make
 
 # ビルドファイルの内容だけ確認 (書き込まない)
 ./configure.py --variant C++/openacc/auto.def --machine local --mode gpu --dry-run

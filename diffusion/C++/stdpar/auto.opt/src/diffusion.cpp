@@ -21,7 +21,7 @@ double diffusion3d(int nx, int ny, int nz, int mgn, flt dx, flt dy, flt dz, flt 
     const flt cc = 1.0F - (ce + cw + cn + cs + ct + cb);
 
     std::for_each_n
-    ( std::execution::par, boost::iterators::counting_iterator<int32_t>(0), nx*ny*nz, [&](int iter)
+    ( std::execution::par, boost::iterators::counting_iterator<int32_t>(0), nx*ny*nz, [=](int iter)
     {
       int ix = iter + nx*ny*mgn;
       int k = (ix/(nx*ny)) - mgn;
@@ -68,7 +68,7 @@ void init(int nx, int ny, int nz, int mgn, flt dx, flt dy, flt dz, flt *f)
     const flt kz = kx;
 
     std::for_each_n
-      ( std::execution::par, boost::iterators::counting_iterator<int32_t>(0), nx*ny*(nz+2*mgn), [&](int iter)
+      ( std::execution::par, boost::iterators::counting_iterator<int32_t>(0), nx*ny*(nz+2*mgn), [=](int iter)
     {
       int ix = iter;
       int k = (ix/(nx*ny)) - mgn;
@@ -114,7 +114,7 @@ double err(double time, int nx, int ny, int nz, int mgn, flt dx, flt dy, flt dz,
     ( std::execution::par,
       boost::iterators::counting_iterator<int32_t>(0),
       boost::iterators::counting_iterator<int32_t>(nx*ny*nz),
-      0.0, std::plus<>(), [&](int iter)
+      0.0, std::plus<>(), [=](int iter)
     {
       int ix = iter + nx*ny*mgn;
       int k = (ix/(nx*ny)) - mgn;
