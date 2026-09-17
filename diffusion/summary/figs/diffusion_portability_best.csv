@@ -14,6 +14,7 @@ wisteria,stdpar,cpp,gpu,FP32,16777216,948.1406,auto.opt,managed,NTHREADS=128
 miyabi,do-concurrent,f90,gpu,FP64,16777216,1309.808,auto.def,managed,
 wisteria,do-concurrent,f90,gpu,FP64,16777216,665.7319,auto.opt,managed,
 miyabi,kokkos,cpp,gpu,FP64,16777216,1915.521,range/baseline-fused,kokkos-default,
+wisteria,kokkos,cpp,gpu,FP64,16777216,982.1644,range/uvm-fused,kokkos-uvm,
 miyabi,openacc,cpp,gpu,FP64,16777216,1482.714,manu.opt,separate,NTHREADS=128
 wisteria,openacc,cpp,gpu,FP64,16777216,206.595,auto.def,managed,
 miyabi,openmp-cpu,cpp,cpu,FP64,16777216,51.48846,,cpu-only,

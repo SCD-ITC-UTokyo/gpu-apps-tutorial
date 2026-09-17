@@ -4,7 +4,7 @@ fem の性能可搬性 (performance portability) 図の生成器
 
   問題サイズ N を固定し、6 つの実装
     do concurrent / Kokkos / OpenACC / OpenMP (CPU) / OpenMP target / stdpar
-  を Wisteria (NVIDIA A100) と Miyabi (NVIDIA H200) で並べて比較する。
+  を Wisteria (NVIDIA A100) と Miyabi (NVIDIA GH200) で並べて比較する。
 
   N は「全実装 × 両機種でデータが揃っている」ものを自動選択する
   (揃い方が同じなら大きい N)。--N で明示指定も可能。
@@ -12,7 +12,7 @@ fem の性能可搬性 (performance portability) 図の生成器
 
   1 枚の図の中身:
     パネル = 精度 (FP32 / FP32-64 混合 / FP64)
-    x      = 実装、棒 = 機種 (A100 / H200)、y = 性能 [GFLOPS] (log)
+    x      = 実装、棒 = 機種 (A100 / GH200)、y = 性能 [GFLOPS] (log)
     棒の値は variant / メモリモデル / 言語 (C++ or Fortran) /
     スレッド数などを振った中の best 値。棒の上のラベルは
     GFLOPS 値と、その best を出した言語。
@@ -49,7 +49,7 @@ N_LIMIT = None
 # csv の machine 値 -> (凡例名, 色)
 MACHINES = {
     "wisteria": ("Wisteria (A100)", "#4c78a8"),
-    "miyabi":   ("Miyabi (H200)",   "#e45756"),
+    "miyabi":   ("Miyabi (GH200)",   "#e45756"),
 }
 
 # 図に並べる実装と表示名 (この順に左から並ぶ)
@@ -206,7 +206,7 @@ def draw(best: pd.DataFrame, N: int, outdir: str,
     fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 0.905),
                ncol=ncol, frameon=False, fontsize=9.5)
     fig.suptitle(f"{APP_TITLE} — implementation comparison at fixed "
-                 f"N = {N:,}\nWisteria (A100) vs Miyabi (H200), "
+                 f"N = {N:,}\nWisteria (A100) vs Miyabi (GH200), "
                  f"{lang_policy(lang, fallback)}", fontsize=12)
     fig.subplots_adjust(top=0.72 if len(handles) > 2 else 0.78)
 

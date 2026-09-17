@@ -2,6 +2,7 @@ machine,impl,language,mode,fp_label,N,gflops,variant,memory_model,optimization_p
 miyabi,do-concurrent,f90,uni,FP32,274625,128.4901,auto.opt,unified,
 wisteria,do-concurrent,f90,gpu,FP32,274625,69.33413,auto.opt,managed,
 miyabi,kokkos,cpp,gpu,FP32,274625,122.0255,team/baseline,kokkos-default,"node=miyabi-g(GH200-GPU),kokkos=4.7.02(sm_90)"
+wisteria,kokkos,cpp,gpu,FP32,274625,69.0656,team/baseline,kokkos-default,
 miyabi,openacc,cpp,uni,FP32,274625,79.97709,auto.opt,unified,NTHREADS=128
 wisteria,openacc,cpp,gpu,FP32,274625,41.77446,auto.opt,managed,NTHREADS=128
 miyabi,openmp-cpu,cpp,cpu,FP32,274625,13.21469,,cpu-only,node=miyabi-c(Intel)

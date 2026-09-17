@@ -48,7 +48,7 @@ Dirichlet 境界条件、精度は FP32 / FP64 切替可。
 
 問題サイズ N を固定して、6 つの実装
 (do concurrent / Kokkos / OpenACC / OpenMP CPU / OpenMP target / stdpar) を
-Wisteria (NVIDIA A100) と Miyabi (NVIDIA H200) で比較した図を、
+Wisteria (NVIDIA A100) と Miyabi (NVIDIA GH200) で比較した図を、
 **アプリごとに 1 枚**生成します。
 
 作図スクリプトはアプリごとに `<app>/summary/make_portability_fig.py` に置いてあります。
@@ -66,7 +66,7 @@ python3 nbody/summary/make_portability_fig.py --lang all # 言語を問わず be
 図の読み方:
 
 - パネル = 精度 (FP32 / FP32-64 混合 / FP64)、x 軸 = 実装、y 軸 = 性能 GFLOPS (log)
-- 青 = Wisteria (A100)、赤 = Miyabi (H200)。同じ実装の 2 本の高さの比が可搬性を表す
+- 青 = Wisteria (A100)、赤 = Miyabi (GH200)。同じ実装の 2 本の高さの比が可搬性を表す
 - 棒の値は variant (auto/manu × def/opt)、メモリモデル (separate / managed / UVM)、
   スレッド数・タイル幅などを振った中の **best 値**。
   棒の上のラベルは GFLOPS 値と、その best を出した言語 (C++ / F)
@@ -80,9 +80,9 @@ python3 nbody/summary/make_portability_fig.py --lang all # 言語を問わず be
   上限を設けて選ぶ (各スクリプト中の `N_LIMIT`: diffusion < 1e8, nbody < 1e5, fem は制限なし)。
   現状の選択値は diffusion: 16,777,216 / fem: 274,625 / nbody: 65,536。
   `--N` で任意の N に変更可能
-- データが無い組み合わせは "no data" と表示。現状残っているのは
-  diffusion の Wisteria / Kokkos / FP64 と fem の Wisteria / Kokkos / FP32 の 2 つ
-  (どちらも Kokkos の精度切替修正を入れた Wisteria 側の再計測で埋まる)
+- データが無い組み合わせは "no data" と表示。2026-09-17 の Wisteria 追加計測
+  (Kokkos FP64 / FP32) で最後の 2 セルが埋まり、**3 アプリとも
+  「全実装 × 全精度 × 両機種」が揃いました**
 
 機種ごとの未計測データは [wisteria.md](wisteria.md) / [miyabi.md](miyabi.md) に
 優先度付きでまとめてあります。
