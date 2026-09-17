@@ -1,37 +1,37 @@
-machine,impl,language,fp_label,N,gflops,variant,memory_model,optimization_param
-miyabi,do-concurrent,f90,FP32,65536,23783.323361958708,auto.opt,unified,-
-wisteria,do-concurrent,f90,FP32,65536,9377.944066997718,auto.opt,unified,-
-miyabi,kokkos,cpp,FP32,65536,9049.013374340791,team/cpu-chunk-sweep,kokkos-default,-
-wisteria,kokkos,cpp,FP32,65536,6823.0989581715385,team/uvm-chunk-sweep,separate,-
-miyabi,openacc,f90,FP32,65536,13930.993671212493,manu.opt,separate,-
-wisteria,openacc,f90,FP32,65536,7255.678767936875,manu.opt,separate,-
-miyabi,openmp-cpu,cpp,FP32,65536,918.1923045466908,,cpu-only,node=miyabi-c(Intel)
-wisteria,openmp-cpu,f90,FP32,65536,1626.6079792096202,,cpu-only,"node=wisteria-o(A64FX 48core),compiler=fccpx/frtpx"
-miyabi,openmp-target,f90,FP32,65536,14249.63897685058,auto.opt,unified,-
-wisteria,openmp-target,f90,FP32,65536,7253.358607507178,manu.opt,separate,-
-miyabi,stdpar,cpp,FP32,65536,9048.0,auto.opt,unified,-
-wisteria,stdpar,cpp,FP32,65536,6816.0,auto.def,unified,-
-miyabi,do-concurrent,f90,FP32/64 mixed,65536,16634.565073429687,auto.opt,unified,-
-wisteria,do-concurrent,f90,FP32/64 mixed,65536,6892.36774896626,auto.opt,unified,-
-miyabi,kokkos,cpp,FP32/64 mixed,65536,5699.399402662866,range/cpu-sweep,kokkos-default,O2
-wisteria,kokkos,cpp,FP32/64 mixed,65536,3008.0505354003394,range/cpu-sweep,kokkos-default,O2
-miyabi,openacc,f90,FP32/64 mixed,65536,9192.892439051551,manu.opt,separate,-
-wisteria,openacc,f90,FP32/64 mixed,65536,4912.331368784693,auto.opt,unified,-
-miyabi,openmp-cpu,f90,FP32/64 mixed,65536,606.4718481867263,,cpu-only,node=miyabi-c(Intel)
-wisteria,openmp-cpu,f90,FP32/64 mixed,65536,740.662914551958,,cpu-only,"node=wisteria-o(A64FX 48core),compiler=fccpx/frtpx"
-miyabi,openmp-target,f90,FP32/64 mixed,65536,9305.601767247255,auto.opt,unified,-
-wisteria,openmp-target,f90,FP32/64 mixed,65536,4901.794235032161,auto.opt,unified,-
-miyabi,stdpar,cpp,FP32/64 mixed,65536,5688.0,auto.def,unified,-
-wisteria,stdpar,cpp,FP32/64 mixed,65536,3000.0,auto.def,unified,-
-miyabi,do-concurrent,f90,FP64,65536,5509.862104043072,auto.def,unified,-
-wisteria,do-concurrent,f90,FP64,65536,3904.771070612465,auto.opt,unified,-
-miyabi,kokkos,cpp,FP64,65536,5695.642540758034,mdrange/cpu-tile-sweep,kokkos-default,-
-wisteria,kokkos,cpp,FP64,65536,3007.7506802846187,range/cpu-sweep,kokkos-default,O3
-miyabi,openacc,cpp,FP64,65536,5688.0,auto.def,unified,-
-wisteria,openacc,f90,FP64,65536,3027.2997442038613,manu.opt,separate,-
-miyabi,openmp-cpu,f90,FP64,65536,621.4739022021253,,cpu-only,node=miyabi-c(Intel)
-wisteria,openmp-cpu,f90,FP64,65536,539.8806764743816,,cpu-only,"node=wisteria-o(A64FX 48core),compiler=fccpx/frtpx"
-miyabi,openmp-target,cpp,FP64,65536,5688.0,auto.def,unified,-
-wisteria,openmp-target,f90,FP64,65536,3037.6713702027755,manu.opt,separate,-
-miyabi,stdpar,cpp,FP64,65536,5688.0,auto.opt,unified,-
-wisteria,stdpar,cpp,FP64,65536,3000.0,auto.def,unified,-
+machine,impl,language,mode,fp_label,N,gflops,variant,memory_model,optimization_param
+miyabi,do-concurrent,f90,gpu,FP32,65536,23783.323361958708,auto.opt,unified,-
+wisteria,do-concurrent,f90,gpu,FP32,65536,9377.944066997718,auto.opt,unified,-
+miyabi,kokkos,cpp,gpu,FP32,65536,9049.013374340791,team/cpu-chunk-sweep,kokkos-default,-
+wisteria,kokkos,cpp,gpu,FP32,65536,6823.0989581715385,team/uvm-chunk-sweep,separate,-
+miyabi,openacc,cpp,gpu,FP32,65536,8904.0,auto.opt,unified,O2
+wisteria,openacc,cpp,gpu,FP32,65536,6744.0,auto.def,unified,-
+miyabi,openmp-cpu,cpp,cpu,FP32,65536,918.1923045466908,,cpu-only,node=miyabi-c(Intel)
+wisteria,openmp-cpu,cpp,cpu,FP32,65536,743.1524027632132,,cpu-only,"node=wisteria-o(A64FX 48core),compiler=fccpx/frtpx"
+miyabi,openmp-target,cpp,gpu,FP32,65536,8904.0,manu.opt,separate,-
+wisteria,openmp-target,cpp,gpu,FP32,65536,6744.0,auto.opt,unified,-
+miyabi,stdpar,cpp,gpu,FP32,65536,9048.0,auto.opt,unified,-
+wisteria,stdpar,cpp,gpu,FP32,65536,6816.0,auto.def,unified,-
+miyabi,do-concurrent,f90,gpu,FP32/64 mixed,65536,16634.565073429687,auto.opt,unified,-
+wisteria,do-concurrent,f90,gpu,FP32/64 mixed,65536,6892.36774896626,auto.opt,unified,-
+miyabi,kokkos,cpp,gpu,FP32/64 mixed,65536,5699.399402662866,range/cpu-sweep,kokkos-default,O2
+wisteria,kokkos,cpp,gpu,FP32/64 mixed,65536,3008.0505354003394,range/cpu-sweep,kokkos-default,O2
+miyabi,openacc,cpp,gpu,FP32/64 mixed,65536,5688.0,auto.def,unified,-
+wisteria,openacc,cpp,gpu,FP32/64 mixed,65536,3000.0,auto.def,unified,-
+miyabi,openmp-cpu,cpp,cpu,FP32/64 mixed,65536,602.4651267499178,,cpu-only,node=miyabi-c(Intel)
+wisteria,openmp-cpu,cpp,cpu,FP32/64 mixed,65536,373.4279592206608,,cpu-only,"node=wisteria-o(A64FX 48core),compiler=fccpx/frtpx"
+miyabi,openmp-target,cpp,gpu,FP32/64 mixed,65536,5688.0,auto.def,unified,-
+wisteria,openmp-target,cpp,gpu,FP32/64 mixed,65536,3000.0,auto.def,unified,-
+miyabi,stdpar,cpp,gpu,FP32/64 mixed,65536,5688.0,auto.def,unified,-
+wisteria,stdpar,cpp,gpu,FP32/64 mixed,65536,3000.0,auto.def,unified,-
+miyabi,do-concurrent,f90,gpu,FP64,65536,5509.862104043072,auto.def,unified,-
+wisteria,do-concurrent,f90,gpu,FP64,65536,3904.771070612465,auto.opt,unified,-
+miyabi,kokkos,cpp,gpu,FP64,65536,5695.642540758034,mdrange/cpu-tile-sweep,kokkos-default,-
+wisteria,kokkos,cpp,gpu,FP64,65536,3007.7506802846187,range/cpu-sweep,kokkos-default,O3
+miyabi,openacc,cpp,gpu,FP64,65536,5688.0,auto.def,unified,-
+wisteria,openacc,cpp,gpu,FP64,65536,3000.0,auto.def,unified,-
+miyabi,openmp-cpu,cpp,cpu,FP64,65536,593.2231387534991,,cpu-only,node=miyabi-c(Intel)
+wisteria,openmp-cpu,cpp,cpu,FP64,65536,296.6735338368049,,cpu-only,"node=wisteria-o(A64FX 48core),compiler=fccpx/frtpx"
+miyabi,openmp-target,cpp,gpu,FP64,65536,5688.0,auto.def,unified,-
+wisteria,openmp-target,cpp,gpu,FP64,65536,3000.0,auto.def,unified,-
+miyabi,stdpar,cpp,gpu,FP64,65536,5688.0,auto.opt,unified,-
+wisteria,stdpar,cpp,gpu,FP64,65536,3000.0,auto.def,unified,-

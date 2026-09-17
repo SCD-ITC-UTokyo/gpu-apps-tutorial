@@ -20,7 +20,8 @@ diffusion の性能可搬性 (performance portability) 図の生成器
     GFLOPS 値と、その best を出した言語。
 
 使い方 (このディレクトリで):
-    python3 make_portability_fig.py            # N は自動選択
+    python3 make_portability_fig.py            # N は自動選択、C++ に統一
+    python3 make_portability_fig.py --lang all # 言語を問わず best (旧挙動)
     python3 make_portability_fig.py --N 2097152  # N を明示指定
 
     入力 : ./diffusion.csv
@@ -35,6 +36,7 @@ import os
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
 import numpy as np
 import pandas as pd
 
@@ -62,6 +64,11 @@ IMPLS = [
     ("stdpar",        "stdpar\n(C++)"),
 ]
 
+# CPU パーティションでの実行 (OpenMP CPU など) は GPU と土俵が違うので、
+# 機種の色を保ったまま淡色 + ハッチで塗り分ける。
+CPU_FACE = {"wisteria": "#b6cce0", "miyabi": "#f6bcbb"}
+CPU_HATCH = "//"
+
 LANG_TAG = {"cpp": "C++", "f90": "F"}
 FP_ORDER = ["FP32", "FP32/64 mixed", "FP64"]
 
@@ -72,8 +79,18 @@ def fp_label(raw) -> str:
     return {"32": "FP32", "64": "FP64", "32_64": "FP32/64 mixed"}.get(head, f"FP{head}")
 
 
-def load() -> pd.DataFrame:
-    """variant / メモリモデル / 言語 / チューニングパラメータの best を返す。"""
+def load(lang: str = "cpp") -> tuple[pd.DataFrame, list[str]]:
+    """variant / メモリモデル / チューニングパラメータの best を返す。
+
+    lang に "cpp" / "f90" を渡すとその言語の実装だけで best を取る。
+    言語をそろえないと、同じ棒の左右 (Wisteria / Miyabi) で別の言語が選ばれて
+    比較にならないことがある (例: diffusion FP32 の OpenMP CPU は
+    Wisteria が Fortran、Miyabi が C++ で best になる)。
+
+    指定言語の実装が存在しない impl (do concurrent は Fortran のみ、
+    Kokkos / stdpar は C++ のみ) は、元の言語のまま残す。
+    戻り値の 2 つめはそのフォールバックした impl の一覧。
+    """
     csv = os.path.join(HERE, f"{APP}.csv")
     df = pd.read_csv(csv, encoding="utf-8-sig")
     df["N"] = pd.to_numeric(df["N"], errors="coerce")
@@ -81,11 +98,20 @@ def load() -> pd.DataFrame:
     df = df[df["N"].notna() & df["performance_gflops"].notna()]
     df = df[df["machine"].isin(MACHINES) & df["impl"].isin(dict(IMPLS))]
     df["fp_label"] = df["fp"].map(fp_label)
+
+    fallback: list[str] = []
+    if lang != "all":
+        have = df.groupby("impl")["language"].agg(set).to_dict()
+        fallback = [i for i, _ in IMPLS if i in have and lang not in have[i]]
+        selectable = df["impl"].map(lambda i: lang in have.get(i, set()))
+        df = df[(~selectable) | (df["language"] == lang)]
+
     idx = df.groupby(["machine", "impl", "fp_label", "N"])["performance_gflops"].idxmax()
-    best = df.loc[idx, ["machine", "impl", "language", "fp_label", "N",
+    best = df.loc[idx, ["machine", "impl", "language", "mode", "fp_label", "N",
                         "performance_gflops", "variant", "memory_model",
                         "optimization_param"]]
-    return best.rename(columns={"performance_gflops": "gflops"}).reset_index(drop=True)
+    return (best.rename(columns={"performance_gflops": "gflops"}).reset_index(drop=True),
+            fallback)
 
 
 def pick_N(best: pd.DataFrame) -> int:
@@ -108,7 +134,20 @@ def pick_N(best: pd.DataFrame) -> int:
     return N
 
 
-def draw(best: pd.DataFrame, N: int, outdir: str) -> list[str]:
+def lang_policy(lang: str, fallback: list[str] | None) -> str:
+    """図のサブタイトルに出す「何の中の best か」の説明文を組み立てる。"""
+    if lang == "all":
+        return "best over variants / memory models / languages"
+    name = {"cpp": "C++", "f90": "Fortran"}[lang]
+    text = f"best over variants / memory models — {name} only"
+    labels = [lbl.replace("\n", " ") for impl, lbl in IMPLS if impl in (fallback or [])]
+    if labels:
+        text += f" ({', '.join(labels)}: no {name} implementation)"
+    return text
+
+
+def draw(best: pd.DataFrame, N: int, outdir: str,
+         lang: str = "cpp", fallback: list[str] | None = None) -> list[str]:
     sub = best[best["N"] == N]
     fps = [f for f in FP_ORDER if f in set(sub["fp_label"])]
     fig, axes = plt.subplots(1, len(fps), figsize=(6.0 * len(fps), 5.6),
@@ -120,14 +159,22 @@ def draw(best: pd.DataFrame, N: int, outdir: str) -> list[str]:
     for ax, fp in zip(axes, fps):
         p = sub[sub["fp_label"] == fp]
         for k, (machine, (mlabel, color)) in enumerate(MACHINES.items()):
-            vals, tags = [], []
+            vals, tags, modes = [], [], []
             for impl, _ in IMPLS:
                 r = p[(p["impl"] == impl) & (p["machine"] == machine)]
                 vals.append(float(r["gflops"].iloc[0]) if len(r) else np.nan)
                 tags.append(LANG_TAG.get(r["language"].iloc[0], "") if len(r) else "n/a")
+                modes.append(r["mode"].iloc[0] if len(r) else "")
             pos = x + (k - 0.5) * width
-            ax.bar(pos, vals, width, color=color, label=mlabel,
-                   edgecolor="white", linewidth=0.6, zorder=3)
+            # CPU 実行の棒だけ淡色 + ハッチ + 機種色の枠にする
+            faces = [CPU_FACE[machine] if m == "cpu" else color for m in modes]
+            edges = [color if m == "cpu" else "white" for m in modes]
+            bars = ax.bar(pos, vals, width, color=faces, label=mlabel,
+                          edgecolor=edges, linewidth=0.6, zorder=3)
+            for b, m in zip(bars, modes):
+                if m == "cpu":
+                    b.set_hatch(CPU_HATCH)
+                    b.set_linewidth(1.0)
             for xi, v, t in zip(pos, vals, tags):
                 if np.isnan(v):
                     # log 軸では y=0 を指定できないので軸座標で下端に置く
@@ -150,12 +197,20 @@ def draw(best: pd.DataFrame, N: int, outdir: str) -> list[str]:
     axes[0].set_ylabel("performance [GFLOPS]  (log scale)")
 
     handles, labels = axes[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 0.89),
-               ncol=2, frameon=False, fontsize=10)
+    # CPU 実行が図中にあるときだけ、その凡例も出す
+    if (sub["mode"] == "cpu").any():
+        for machine, (mlabel, color) in MACHINES.items():
+            handles.append(Patch(facecolor=CPU_FACE[machine], edgecolor=color,
+                                 hatch=CPU_HATCH, linewidth=1.0))
+            labels.append(f"{mlabel} — CPU partition")
+    # CPU 実行の凡例を足すと 2 行になるので、その分パネルを下げる
+    ncol = 2 if len(handles) > 2 else 2
+    fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 0.905),
+               ncol=ncol, frameon=False, fontsize=9.5)
     fig.suptitle(f"{APP_TITLE} — implementation comparison at fixed "
                  f"N = {N:,}\nWisteria (A100) vs Miyabi (H200), "
-                 "best over variants / memory models / languages", fontsize=12)
-    fig.subplots_adjust(top=0.78)
+                 f"{lang_policy(lang, fallback)}", fontsize=12)
+    fig.subplots_adjust(top=0.72 if len(handles) > 2 else 0.78)
 
     written = []
     for ext in ("png", "pdf"):
@@ -173,14 +228,24 @@ def draw(best: pd.DataFrame, N: int, outdir: str) -> list[str]:
 def main() -> None:
     ap = argparse.ArgumentParser(description=f"{APP} の性能可搬性図を作る")
     ap.add_argument("--N", type=int, default=None, help="固定する問題サイズ N")
+    ap.add_argument("--lang", choices=["cpp", "f90", "all"], default="cpp",
+                    help="best を取る言語 (既定 cpp)。all は言語を問わない旧挙動")
     args = ap.parse_args()
 
     print(f"[{APP}]")
     outdir = os.path.join(HERE, "figs")
     os.makedirs(outdir, exist_ok=True)
-    best = load()
+    best, fallback = load(args.lang)
+    if args.lang == "all":
+        print("  言語: 指定なし (C++ / Fortran の best)")
+    else:
+        name = {"cpp": "C++", "f90": "Fortran"}[args.lang]
+        print(f"  言語: {name} に統一")
+        for impl in fallback:
+            only = "Fortran" if args.lang == "cpp" else "C++"
+            print(f"    - {impl} は {name} 実装が無いため {only} のまま")
     N = args.N if args.N is not None else pick_N(best)
-    for p in draw(best, N, outdir):
+    for p in draw(best, N, outdir, args.lang, fallback):
         print("  ->", os.path.relpath(p, HERE))
 
 

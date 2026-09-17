@@ -56,7 +56,7 @@ Wisteria (NVIDIA A100) と Miyabi (NVIDIA H200) で比較した図を、
 ```bash
 python3 diffusion/summary/make_portability_fig.py        # N は自動選択
 python3 fem/summary/make_portability_fig.py --N 35937    # N を明示指定
-python3 nbody/summary/make_portability_fig.py
+python3 nbody/summary/make_portability_fig.py --lang all # 言語を問わず best (旧挙動)
 ```
 
 出力は `<app>/summary/figs/<app>_portability.{png,pdf}`、
@@ -68,8 +68,13 @@ python3 nbody/summary/make_portability_fig.py
 - パネル = 精度 (FP32 / FP32-64 混合 / FP64)、x 軸 = 実装、y 軸 = 性能 GFLOPS (log)
 - 青 = Wisteria (A100)、赤 = Miyabi (H200)。同じ実装の 2 本の高さの比が可搬性を表す
 - 棒の値は variant (auto/manu × def/opt)、メモリモデル (separate / managed / UVM)、
-  言語 (C++ / Fortran)、スレッド数・タイル幅などを振った中の **best 値**。
+  スレッド数・タイル幅などを振った中の **best 値**。
   棒の上のラベルは GFLOPS 値と、その best を出した言語 (C++ / F)
+- **言語は C++ にそろえてある** (`--lang` の既定値)。言語を問わずに best を取ると、
+  同じ実装でも機種ごとに別の言語が選ばれて比較にならないため
+  (例: diffusion FP32 の OpenMP CPU は Wisteria が Fortran、Miyabi が C++ で best)。
+  do concurrent だけは C++ 実装が無いので Fortran のまま残し、図のサブタイトルと
+  棒のラベル `(F)` で明示する。`--lang f90` で Fortran に統一、`--lang all` で旧挙動
 - N は「全実装 × 両機種でデータが揃う」ものを自動選択 (揃い方が同じなら大きい N)。
   diffusion と nbody は N を大きくすると性能が飽和・低下して実装間の差が消えるため、
   上限を設けて選ぶ (各スクリプト中の `N_LIMIT`: diffusion < 1e8, nbody < 1e5, fem は制限なし)。
