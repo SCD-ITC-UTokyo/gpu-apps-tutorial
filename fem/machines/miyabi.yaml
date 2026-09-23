@@ -73,4 +73,20 @@ kokkos:
   #       Kokkos 4.x = C++17、Kokkos 5.x = C++20 必須 (5.x を使うなら 20 に変更)。
   #       Miyabi (GH200) では 4.7.02 を CUDA(sm_90)+OpenMP backend でビルドして動作確認済み。
   root: /xxx/kokkos/4.7.02/
+  # Miyabi も mode でアーキが変わる (GPU/uni=Miyabi-G: GH200 = Grace aarch64 + H100 /
+  # CPU=Miyabi-C: Intel Xeon x86_64)。Kokkos の実行空間とアーキは install 時に決まるため、
+  # Wisteria と同じく install を mode ごとに分ける必要がある。
+  # ここに書けば configure.py が mode に応じて使い分ける (未記入なら上の root → 自動検出)。
+  # (Kokkos は uni 非対応 — implementations.yaml の needs_mode: [gpu, cpu])
+  #   gpu: CUDA backend (KOKKOS_ARCH_HOPPER90) + OpenMP を有効にした aarch64 版
+  #   cpu: OpenMP backend のみ + KOKKOS_ARCH_SPR の x86_64 版
+  root_per_mode:
+    gpu: /xxx/kokkos/4.7.02
+    cpu: /xxx/kokkos/4.7.02-spr
+  # Kokkos をビルドした module 環境。生成ジョブスクリプトの「環境設定」推奨例に使う。
+  # 実際に Kokkos をビルドしたときの module と揃えること
+  # (揃っていないと共有ライブラリの GLIBCXX が合わず起動時に落ちる)。
+  modules_per_mode:
+    gpu: ["nvidia/25.9"]
+    cpu: ["intel"]
   cxx_standard: 17

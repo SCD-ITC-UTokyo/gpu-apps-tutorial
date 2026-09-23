@@ -596,8 +596,12 @@ def resolve_build_config(args, app, impls, machine, machine_name) -> dict:
         # mode ごとに Kokkos install を分けられる (kokkos.root_per_mode.<mode>)。
         # 例: Wisteria は GPU=Aquarius(x86+A100) / CPU=Odyssey(A64FX) でアーキが違うため、
         #     同じ Kokkos install を使い回せない。無ければ従来どおり kokkos.root を見る。
-        yaml_kokkos_root = ((kokkos_block.get("root_per_mode") or {}).get(args.mode)
-                            or kokkos_block.get("root", ""))
+        per_mode_root = (kokkos_block.get("root_per_mode") or {}).get(args.mode)
+        yaml_kokkos_root = per_mode_root or kokkos_block.get("root", "")
+        # どちらの key から来たかを表示に使う (root_per_mode は mode ごとに違う値になるため、
+        # 読者が「どの install が選ばれたか」を追えるようにする)
+        yaml_root_key = (f"kokkos.root_per_mode.{args.mode}"
+                         if per_mode_root else "kokkos.root")
         cli_kokkos_root = getattr(args, "kokkos_root", None)
         kr_is_placeholder = is_placeholder_kokkos_root(yaml_kokkos_root)
         kokkos_root_unresolved = False
@@ -610,6 +614,7 @@ def resolve_build_config(args, app, impls, machine, machine_name) -> dict:
         elif not kr_is_placeholder:
             kokkos_root = yaml_kokkos_root
             kokkos_root_source = "yaml"
+            kokkos_root_yaml_key = yaml_root_key
             if not is_kokkos_install(kokkos_root):
                 detected = detect_kokkos_root()
                 if detected:
@@ -685,6 +690,7 @@ def resolve_build_config(args, app, impls, machine, machine_name) -> dict:
             "kokkos_root": kokkos_root,
             "kokkos_root_unresolved": kokkos_root_unresolved,
             "kokkos_root_source": kokkos_root_source,
+            "kokkos_root_yaml_key": locals().get("kokkos_root_yaml_key", "kokkos.root"),
             "cxx_standard": cxx_standard,
             "policy": policy,
             "sub": sub,
@@ -1401,8 +1407,9 @@ def generate_cmake_kokkos(cfg: dict, args, machine_name: str) -> Tuple[Path, str
     # Kokkos install prefix の挿入行 (解決元 / 未解決で出し分け)
     kroot = cfg["kokkos_root"]
     kroot_src = cfg.get("kokkos_root_source", "yaml")
+    kroot_key = cfg.get("kokkos_root_yaml_key", "kokkos.root")
     src_label = {"cli": "--kokkos-root 指定", "env": "環境変数 Kokkos_ROOT",
-                 "yaml": "machine yaml の kokkos.root"}.get(kroot_src, kroot_src)
+                 "yaml": f"machine yaml の {kroot_key}"}.get(kroot_src, kroot_src)
     if cfg.get("kokkos_root_unresolved"):
         kokkos_install_block = [
             "# !!! Kokkos install prefix 未解決 !!!",
@@ -2339,8 +2346,9 @@ def main() -> int:
         if len(kroot) > 70:
             kroot = "..." + kroot[-67:]
         kroot_src = cfg.get('kokkos_root_source', 'yaml')
+        kroot_key = cfg.get('kokkos_root_yaml_key', 'kokkos.root')
         src_label = {"cli": "--kokkos-root 明示指定", "env": "環境変数 Kokkos_ROOT 自動検出",
-                     "yaml": "machine yaml の kokkos.root"}.get(kroot_src, kroot_src)
+                     "yaml": f"machine yaml の {kroot_key}"}.get(kroot_src, kroot_src)
         if cfg.get('kokkos_root_unresolved'):
             print(f"  ! kokkos root : '{kroot}' (placeholder。--kokkos-root か環境変数 Kokkos_ROOT で指定してください)")
         else:

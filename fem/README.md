@@ -620,10 +620,6 @@ python3 summary/parse_logs.py --input results/miyabi --append summary/fem.csv   
 
 ## 詳しく知りたい人向け
 
-このドキュメントは **現在の実装がどうなっているか** だけを説明しています。
-元コードからの変更点、計測データの由来、既知のデータ品質の問題は
-[../HISTORY.md](../HISTORY.md) にまとめてあります。
-
 
 - diffusion アプリの README (`diffusion/README.md`) と相補的: 同じ configure.py / 同じ yaml 仕様 / 同じ CSV 形式 で 2 アプリを比較できます
 - 各 impl の固有事情は `diffusion/<lang>/<impl>/README.md` 等を参照。fem 側は Kokkos のみ

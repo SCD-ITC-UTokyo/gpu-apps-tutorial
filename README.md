@@ -17,21 +17,17 @@
 ## 3 つのアプリケーションと問題設定
 
 ### 1. diffusion — 3 次元拡散方程式（有限差分法）
-3 次元拡散方程式 **∂f/∂t = κ ∇²f** を有限差分法（7 点ステンシル）で陽的に時間積分するベンチマーク。
-Dirichlet 境界条件、精度は FP32 / FP64 切替可。
+3 次元拡散方程式 **∂f/∂t = κ ∇²f** を、空間 2 次精度の中心差分（7 点ステンシル）と
+時間 1 次精度の前進 Euler 法を組み合わせた **FTCS 法 (Forward Time Centered Space)** の陽解法で解くアプリ。
 
 ### 2. fem — 3 次元有限要素法（CG ソルバ）
 3 次元の熱伝導／構造解析問題を有限要素法で離散化し、**共役勾配法 (Conjugate Gradient)** で解くアプリ。
 
 ### 3. nbody — 直接法重力多体問題
-直接法による重力多体計算を、時間 2 次精度の leapfrog 法で軌道積分するアプリ。
+直接法による重力多体計算を、時間 2 次精度の **leapfrog 法** で軌道積分するアプリ。
 
 
 ---
-
-各アプリの README と build-tutorial.html は現在の実装の説明に徹しています。
-元コードからの変更点・計測データの由来・既知のデータ品質の問題は
-[HISTORY.md](HISTORY.md) を参照してください。
 
 ## 各アプリの詳細・使い方・性能評価
 
@@ -51,38 +47,25 @@ Dirichlet 境界条件、精度は FP32 / FP64 切替可。
 Wisteria (NVIDIA A100) と Miyabi (NVIDIA GH200) で比較した図を、
 **アプリごとに 1 枚**生成します。
 
-作図スクリプトはアプリごとに `<app>/summary/make_portability_fig.py` に置いてあります。
+### diffusion (3D ステンシル) — N = 16,777,216
 
-```bash
-python3 diffusion/summary/make_portability_fig.py        # N は自動選択
-python3 fem/summary/make_portability_fig.py --N 35937    # N を明示指定
-python3 nbody/summary/make_portability_fig.py --lang all # 言語を問わず best (旧挙動)
-```
+[![diffusion の性能可搬性: 6 実装 × FP32/FP64 を A100 と GH200 で比較](diffusion/summary/figs/diffusion_portability.png)](diffusion/summary/figs/diffusion_portability.png)
 
-出力は `<app>/summary/figs/<app>_portability.{png,pdf}`、
-図の元データ (プロットした best 値とその variant / メモリモデル) は
-`<app>_portability_best.csv` に出ます。
+### fem (CG ソルバ) — N = 274,625
+
+[![fem の性能可搬性: 6 実装 × FP32/FP64 を A100 と GH200 で比較](fem/summary/figs/fem_portability.png)](fem/summary/figs/fem_portability.png)
+
+### nbody (直接法 重力多体) — N = 65,536
+
+[![nbody の性能可搬性: 6 実装 × FP32/混合/FP64 を A100 と GH200 で比較](nbody/summary/figs/nbody_portability.png)](nbody/summary/figs/nbody_portability.png)
 
 図の読み方:
 
-- パネル = 精度 (FP32 / FP32-64 混合 / FP64)、x 軸 = 実装、y 軸 = 性能 GFLOPS (log)
+- パネル = 精度 (FP32 / FP32-64 混合 / FP64)、x 軸 = 実装、y 軸 = 性能 GFLOPS (対数)
 - 青 = Wisteria (A100)、赤 = Miyabi (GH200)。同じ実装の 2 本の高さの比が可搬性を表す
+- 淡色 + 斜線の棒は CPU での実行。GPU とは比較の土俵が違うことを示す
 - 棒の値は variant (auto/manu × def/opt)、メモリモデル (separate / managed / UVM)、
-  スレッド数・タイル幅などを振った中の **best 値**。
-  棒の上のラベルは GFLOPS 値と、その best を出した言語 (C++ / F)
-- **言語は C++ にそろえてある** (`--lang` の既定値)。言語を問わずに best を取ると、
-  同じ実装でも機種ごとに別の言語が選ばれて比較にならないため
-  (例: diffusion FP32 の OpenMP CPU は Wisteria が Fortran、Miyabi が C++ で best)。
-  do concurrent だけは C++ 実装が無いので Fortran のまま残し、図のサブタイトルと
-  棒のラベル `(F)` で明示する。`--lang f90` で Fortran に統一、`--lang all` で旧挙動
-- N は「全実装 × 両機種でデータが揃う」ものを自動選択 (揃い方が同じなら大きい N)。
-  diffusion と nbody は N を大きくすると性能が飽和・低下して実装間の差が消えるため、
-  上限を設けて選ぶ (各スクリプト中の `N_LIMIT`: diffusion < 1e8, nbody < 1e5, fem は制限なし)。
-  現状の選択値は diffusion: 16,777,216 / fem: 274,625 / nbody: 65,536。
-  `--N` で任意の N に変更可能
-- データが無い組み合わせは "no data" と表示。2026-09-17 の Wisteria 追加計測
-  (Kokkos FP64 / FP32) で最後の 2 セルが埋まり、**3 アプリとも
-  「全実装 × 全精度 × 両機種」が揃いました**
-
-機種ごとの未計測データは [wisteria.md](wisteria.md) / [miyabi.md](miyabi.md) に
-優先度付きでまとめてあります。
+  タイル幅などを振った中の **best 値**
+- 言語は C++ にそろえてある。do concurrent だけは C++ 実装が無いので Fortran
+  (棒のラベルの `(F)` が目印)
+- N は全実装・両機種でデータが揃うものを自動選択。`--N` で変更可

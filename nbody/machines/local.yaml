@@ -40,7 +40,25 @@ gpu:
 job:
   scheduler: none
 
-# kokkos: ローカル機にはデフォルトでは設定しない (任意で記入)
+# kokkos: ローカル機にはデフォルトでは設定しない (任意で記入)。
+# 未記入でも configure.py が環境変数 Kokkos_ROOT / CMAKE_PREFIX_PATH / ~/kokkos/* 等から
+# 自動検出し、それも失敗したら --kokkos-root での明示指定を促す。
+#
+# ローカル機は mode を変えてもアーキが同じなので、通常は root だけで足りる:
 # kokkos:
 #   root: /opt/kokkos/5.0.2
+#   cxx_standard: 17
+#
+# GPU 用 (CUDA backend) と CPU 用 (OpenMP backend のみ) を別々に install してある場合は、
+# Wisteria / Miyabi と同じく mode ごとに指定できる。
+# configure.py は Kokkos install の backend と --mode の整合性も検査するので、
+# GPU backend の無い install に --mode gpu を指定するとエラーで止まる。
+# kokkos:
+#   root_per_mode:
+#     gpu: /opt/kokkos/5.0.2
+#     cpu: /opt/kokkos/5.0.2-openmp
+#   # ローカル機に module 環境が無ければ modules_per_mode は不要 (省略可)
+#   modules_per_mode:
+#     gpu: []
+#     cpu: []
 #   cxx_standard: 17

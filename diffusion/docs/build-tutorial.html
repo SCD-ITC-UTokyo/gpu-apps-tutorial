@@ -276,6 +276,27 @@ OpenMP 経験者が GPU プログラミングモデルを横断的に学べる�
 各 impl は <span class="key">pragma 1〜3 行レベルの違い</span> で済むようコードを揃えています。
 </p>
 
+<h3>解いている問題</h3>
+<p>
+空間は 2 次精度の中心差分 (7 点ステンシル)、時間は 1 次精度の前進 Euler 法で離散化した
+<span class="key">FTCS 法 (Forward Time Centered Space)</span> の陽解法です。1 ステップの更新は
+<code>fn[ix] = cc*f[ix] + ce*f[ip] + cw*f[im] + cn*f[jp] + cs*f[jm] + ct*f[kp] + cb*f[km]</code>
+の 1 行で、係数は <code>ce = κ·dt/dx²</code> 等、中心係数は <code>cc = 1 − (ce+cw+cn+cs+ct+cb)</code> です。
+</p>
+<p>
+境界条件は <span class="key">ゼロ勾配 (Neumann)</span> です。ソースでは領域外を参照する代わりに
+自分自身の添字を使う形で実装されています (<code>diffusion.c</code>)。
+</p>
+<div class="code-block">
+  <div class="code-header"><span class="code-label">c</span></div>
+<pre><code>const int ip = i == nx - 1 ? ix : ix + 1;   // 右端では自分自身を参照 = 勾配 0
+const int im = i == 0      ? ix : ix - 1;   // 左端も同様</code></pre>
+</div>
+<p>
+初期条件は各方向に波数 2π の正弦波で、計算精度は <code>cmake -DFP=32</code> / <code>-DFP=64</code> で
+FP32 / FP64 を切り替えられます。
+</p>
+
 <table>
 <thead><tr><th>方式</th><th>C/C++</th><th>Fortran</th><th>特徴</th></tr></thead>
 <tbody>

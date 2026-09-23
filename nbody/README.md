@@ -285,9 +285,6 @@ nbody は 3 種類の浮動小数精度を使い分けます (define で制御):
 - `<variant>` (非 Kokkos) = `auto.def` / `auto.opt` / `manu.def` / `manu.opt`
 - `<policy>/<sub>` (Kokkos) = `{range,mdrange,team}/{baseline, cpu-sweep/tile/chunk, uvm, uvm-...}` (sub 名は policy 別)
 
-計測データの `source_file` 列に現れる旧 ID (`A1`〜`F4`) との対応は
-[../HISTORY.md](../HISTORY.md) を参照してください。
-
 ---
 
 ## 出力フィールド (25 列 CSV)
@@ -482,10 +479,6 @@ python3 visualize.py
 ---
 
 ## 詳しく知りたい人向け
-
-このドキュメントは **現在の実装がどうなっているか** だけを説明しています。
-元コードからの変更点、計測データの由来、既知のデータ品質の問題は
-[../HISTORY.md](../HISTORY.md) にまとめてあります。
 
 
 - diffusion (`diffusion/README.md`) / fem (`fem/README.md`) と相補的。3 アプリで GPU プログラミングモデルの memory-bound / compute-bound / mixed 特性を一通り体験できる
