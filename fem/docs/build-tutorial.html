@@ -349,20 +349,60 @@ cmake --build build-local-gpu</code></pre>
 <div class="code-block">
   <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
 <pre><code># メッシュは実行時に内部生成されるので入力ファイルは不要
-./build-local-gpu/fem.gpu.32 65</code></pre>
+./build-local-gpu/fem.gpu.32 65
+# 変更例 (引数は位置で指定): 収束判定を 1.0e-6 に → ./build-local-gpu/fem.gpu.32 65 2000 1.0 1.0 1.0e-6</code></pre>
 </div>
 
 <p>引数は <span class="key">1 辺あたりの節点数 N</span> です (diffusion / nbody と同じく入力ファイルは持ちません)。
 <code>65</code> なら 65<sup>3</sup> = 274,625 節点、64<sup>3</sup> 六面体要素の立方体メッシュが<strong>実行時に内部生成</strong>されます。
-<code>N</code> を変えるだけで任意サイズが解けます (<code>33</code> なら 35,937 節点)。
-2 番目以降の引数 <code>ITER</code> / <code>COND</code> / <code>QVOL</code> / <code>RESID</code> は省略可で、
-既定は 2000 / 1.0 / 1.0 / 1.0e-08 です。</p>
+<code>N</code> を変えるだけで任意サイズが解けます (<code>33</code> なら 35,937 節点)。</p>
 
-<p>標準出力例 (CSV、10 カラム):</p>
+<p>N の後ろにソルバの設定を 4 つまで続けられます。<span class="key">書いた順番 (位置) で意味が決まる</span>ので、
+後ろの引数だけを変えたいときも手前を既定値で埋めて並べます。</p>
+
+<pre><code>&lt;binary&gt; N [ITER] [COND] [QVOL] [RESID]</code></pre>
+
+<table>
+<thead><tr><th>位置</th><th>引数</th><th>意味</th><th>既定値</th><th>変えると何が変わるか</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><strong>N</strong></td><td>1 辺あたりの節点数 (必須)。節点数 = N<sup>3</sup></td><td>—</td><td><strong>問題サイズ</strong>。性能比較で振るのは基本的にこれだけ</td></tr>
+<tr><td>2</td><td>ITER</td><td>CG 法の<strong>最大</strong>反復数 (打ち切り回数)</td><td>2000</td><td>収束に必要な回数より大きければ<strong>何も変わらない</strong>。小さくすると収束前に打ち切られる</td></tr>
+<tr><td>3</td><td>COND</td><td>熱伝導率 (係数行列にかかる係数)</td><td>1.0</td><td>解が 1/COND 倍になるだけ。<strong>反復回数・性能は変わらない</strong></td></tr>
+<tr><td>4</td><td>QVOL</td><td>体積発熱量 (右辺ベクトルにかかる係数)</td><td>1.0</td><td>解が QVOL 倍になるだけ。<strong>反復回数・性能は変わらない</strong></td></tr>
+<tr><td>5</td><td>RESID</td><td>収束判定の閾値 (相対残差 ‖r‖/‖b‖)</td><td>1.0e-08</td><td><strong>反復回数が変わる</strong>。緩めると減り、厳しくすると増える</td></tr>
+</tbody>
+</table>
+
+<p>COND と QVOL は物理パラメータですが、方程式が線形なので解の大きさを比例させるだけで、
+CG 法の収束の速さには影響しません。<code>N=33</code> での実測 (C++/openmp-cpu、FP64):</p>
+
+<table>
+<thead><tr><th>コマンド</th><th>反復回数</th><th>到達残差</th><th>説明</th></tr></thead>
+<tbody>
+<tr><td><code>fem.cpu.64 33</code></td><td>98</td><td>7.2e-09</td><td>既定値。98 回で収束</td></tr>
+<tr><td><code>fem.cpu.64 33 4000</code></td><td>98</td><td>7.2e-09</td><td>ITER を増やしても変化なし</td></tr>
+<tr><td><code>fem.cpu.64 33 50</code></td><td>51</td><td>7.3e-02</td><td>ITER=50 で打ち切り (未収束)</td></tr>
+<tr><td><code>fem.cpu.64 33 2000 10.0</code></td><td>98</td><td>7.2e-09</td><td>COND を 10 倍。変化なし</td></tr>
+<tr><td><code>fem.cpu.64 33 2000 1.0 100.0</code></td><td>98</td><td>7.2e-09</td><td>QVOL を 100 倍。変化なし</td></tr>
+<tr><td><code>fem.cpu.64 33 2000 1.0 1.0 1.0e-4</code></td><td>75</td><td>7.6e-05</td><td>判定を緩めると反復が減る</td></tr>
+<tr><td><code>fem.cpu.64 33 2000 1.0 1.0 1.0e-12</code></td><td>117</td><td>7.5e-13</td><td>厳しくすると反復が増える</td></tr>
+</tbody>
+</table>
+
+<p>標準出力例 (CSV、10 カラム。上の <code>fem.gpu.32 65</code> をローカル GPU で実行したもの):</p>
 <div class="code-block">
   <div class="code-header"><span class="code-label">output</span><button class="copy-btn">コピー</button></div>
-<pre><code># binary,NP(=node_count),time_sec,performance_gflops,error,real_sec,user_sec,sys_sec,num_time_steps_logged,last_sim_time
-./build-local-gpu/fem.gpu.32,274625, 2.111e-01, 1.656e+01, 1.000e-08, 2.716e+00, 7.680e-01, 1.774e+00, 2000, 5.251e-02</code></pre>
+<pre><code># binary,NP,time_sec,performance_gflops,error,real_sec,user_sec,sys_sec,num_time_steps_logged,last_sim_time
+./build-local-gpu/fem.gpu.32,274625, 8.137393e-02, 6.055892e+01, 9.572404e-09, 4.719560e-01, 2.246260e-01, 2.627320e-01,278, 2.579188e-02</code></pre>
+</div>
+
+<p><code>error</code> 列 (9.57e-09) が到達残差、<code>num_time_steps_logged</code> 列 (278) が実反復回数です。</p>
+
+<div class="note">
+<p><span class="label">未収束に注意:</span>
+ITER に達して打ち切られてもプログラムはエラーにならず、通常どおり GFLOPS を出力します。
+このとき反復回数の列は <strong>ITER + 1</strong> になり、到達残差は RESID より大きくなります。
+性能を比べる前に、反復回数が ITER 以下であることを確認してください。</p>
 </div>
 </div>
 
@@ -551,9 +591,10 @@ export OMP_PLACES=threads
 
 # === 実行 ===
 #   立方体メッシュは実行時に内部生成されるので入力ファイルは不要。
-#   引数: N [ITER] [COND] [QVOL] [RESID]  (2 番目以降は省略可)
+#   引数: N [ITER] [COND] [QVOL] [RESID]  (書いた順番で決まる。2 番目以降は省略可)
 #     ITER =CG 最大反復数 (既定 2000)  COND =熱伝導率 (既定 1.0)
 #     QVOL =体積発熱 (既定 1.0)        RESID=収束判定 (既定 1.0e-08)
+#   変更例 (手前は既定値で埋める): 収束判定を 1.0e-6 に → ./build-miyabi-uni/fem.uni.32 $N 2000 1.0 1.0 1.0e-6
 N=65
 ./build-miyabi-uni/fem.uni.32 $N</code></pre>
 </div>
@@ -585,11 +626,11 @@ qstat                          # 状態確認
 <tr><td>NP</td><td><strong>節点数 (DOF) — 引数 N で決まる (N=65 なら 274625)</strong></td><td>int</td></tr>
 <tr><td>time_sec</td><td>CG ソルバ計算時間</td><td>秒</td></tr>
 <tr><td>performance_gflops</td><td>演算性能 (FLOP / solver_time)</td><td>GFLOPS</td></tr>
-<tr><td>error</td><td><strong>RESID の設定値</strong> (収束後の残差ではない。下の注意を参照)</td><td>float</td></tr>
+<tr><td>error</td><td><strong>CG の到達残差</strong> (相対残差 ‖r‖/‖b‖。収束していれば RESID 以下)</td><td>float</td></tr>
 <tr><td>real_sec</td><td>プログラム全体の wall clock 時間</td><td>秒</td></tr>
 <tr><td>user_sec</td><td>user CPU 時間 (Fortran は cpu_time() 代用)</td><td>秒</td></tr>
 <tr><td>sys_sec</td><td>sys CPU 時間 (Fortran は 0.0 固定)</td><td>秒</td></tr>
-<tr><td>num_time_steps_logged</td><td><strong>最大反復数 ITER の設定値</strong> (実反復数ではない。下の注意を参照)</td><td>int</td></tr>
+<tr><td>num_time_steps_logged</td><td><strong>CG の実反復回数</strong> (未収束で打ち切られた場合は ITER + 1)</td><td>int</td></tr>
 <tr><td>last_sim_time</td><td><strong>matrix assembly 時間</strong> (fem 特有: mat_sec)</td><td>秒</td></tr>
 </tbody>
 </table>
@@ -729,9 +770,10 @@ export OMP_PLACES=threads
 
 # === 実行 ===
 #   立方体メッシュは実行時に内部生成されるので入力ファイルは不要。
-#   引数: N [ITER] [COND] [QVOL] [RESID]  (2 番目以降は省略可)
+#   引数: N [ITER] [COND] [QVOL] [RESID]  (書いた順番で決まる。2 番目以降は省略可)
 #     ITER =CG 最大反復数 (既定 2000)  COND =熱伝導率 (既定 1.0)
 #     QVOL =体積発熱 (既定 1.0)        RESID=収束判定 (既定 1.0e-08)
+#   変更例 (手前は既定値で埋める): 収束判定を 1.0e-6 に → ./build-miyabi-gpu/fem.gpu.32 $N 2000 1.0 1.0 1.0e-6
 N=65
 ./build-miyabi-gpu/fem.gpu.32 $N</code></pre>
 </div>

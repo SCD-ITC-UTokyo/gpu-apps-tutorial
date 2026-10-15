@@ -1050,6 +1050,8 @@ def generate_job_script(cfg: dict, args, machine: dict, machine_name: str,
     lines += [
         "",
         "# === 実行 (N = nx*ny*nz の N; 64 → 64x64x64 立方体) ===",
+        "#   引数は N だけ (2 番目以降は無視)。拡散係数 κ=0.1 などは src/main.* の定数。",
+        f"#   変更例: 128^3 格子で解く → {bin_rel} 128",
         f"N=64",
         f"{bin_rel} $N",
     ]
@@ -2387,6 +2389,9 @@ def main() -> int:
         print(f"  cmake -B {build_dir} -S .")
         print(f"  cmake --build {build_dir}")
         print(f"  # バイナリ: {build_dir}/{cfg['target_base']}.{args.mode}.<FP>")
+        print(f"  {build_dir}/{cfg['target_base']}.{args.mode}.<FP> 64"
+              f"   # 実行 (引数 = 1 辺の格子点数 N)")
+        print(f"  # 変更例: 128^3 格子で解く → ... 128  (κ 等は src/main.* の定数)")
     else:
         print(f"  make -f {out_path.name}")
     if cfg.get("is_exercise"):

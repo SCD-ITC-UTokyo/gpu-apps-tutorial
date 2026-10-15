@@ -1057,9 +1057,10 @@ def generate_job_script(cfg: dict, args, machine: dict, machine_name: str,
         "",
         "# === 実行 (N = 1 辺あたりの節点数; 65 → 65x65x65 = 274625 節点) ===",
         "#   立方体メッシュは実行時に内部生成されるので入力ファイルは不要。",
-        "#   引数: N [ITER] [COND] [QVOL] [RESID]  (2 番目以降は省略可)",
+        "#   引数: N [ITER] [COND] [QVOL] [RESID]  (書いた順番で決まる。2 番目以降は省略可)",
         "#     ITER =CG 最大反復数 (既定 2000)  COND =熱伝導率 (既定 1.0)",
         "#     QVOL =体積発熱 (既定 1.0)        RESID=収束判定 (既定 1.0e-08)",
+        f"#   変更例 (手前は既定値で埋める): 収束判定を 1.0e-6 に → {bin_rel} $N 2000 1.0 1.0 1.0e-6",
         f"N=65",
         f"{bin_rel} $N",
     ]
@@ -2397,6 +2398,9 @@ def main() -> int:
         print(f"  cmake -B {build_dir} -S .")
         print(f"  cmake --build {build_dir}")
         print(f"  # バイナリ: {build_dir}/{cfg['target_base']}.{args.mode}.<FP>")
+        print(f"  {build_dir}/{cfg['target_base']}.{args.mode}.<FP> 65"
+              f"   # 実行 (引数 = 1 辺の節点数 N)")
+        print(f"  # 変更例 (引数は位置で指定): 収束判定を 1.0e-6 に → ... 65 2000 1.0 1.0 1.0e-6")
     else:
         print(f"  make -f {out_path.name}")
     if cfg.get("is_exercise"):

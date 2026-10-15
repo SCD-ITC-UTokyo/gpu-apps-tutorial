@@ -1085,6 +1085,7 @@ def generate_job_script(cfg: dict, args, machine: dict, machine_name: str,
         "#   elapse_min=1.0 [s]) が使われる。変更する場合は下のコメントを参照:",
         "#     --num_min N --num_max N --num_bin N --elapse_min SEC --file NAME",
         "#   使用可能なオプション一覧は --help で表示される。",
+        f"#   変更例: 粒子数 4096〜65536 を 5 点で測る → {bin_rel} --num_min=4096 --num_max=65536 --num_bin=5",
         f"{bin_rel}",
     ]
 
@@ -2453,7 +2454,10 @@ def main() -> int:
     if args.build == "cmake":
         print(f"  cmake -B {build_dir} -S .")
         print(f"  cmake --build {build_dir}")
-        print(f"  # バイナリ: {build_dir}/{cfg['target_base']}.{args.mode}.<FP>")
+        print(f"  # バイナリ: {build_dir}/{cfg['target_base']}.{args.mode}.<FP_L>.<FP_M>")
+        print(f"  {build_dir}/{cfg['target_base']}.{args.mode}.<FP_L>.<FP_M>"
+              f"   # 実行 (引数なしで粒子数 1024〜4194304 を 13 点測定)")
+        print(f"  # 変更例: 粒子数を絞る → ... --num_min=4096 --num_max=65536 --num_bin=5")
     else:
         print(f"  make -f {out_path.name}")
     if cfg.get("is_exercise"):

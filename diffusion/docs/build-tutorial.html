@@ -369,11 +369,35 @@ cmake --build build-local-gpu</code></pre>
 <h4>実行 (引数はグリッドサイズ N)</h4>
 <div class="code-block">
   <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
-<pre><code>./build-local-gpu/diffusion.gpu.32 64</code></pre>
+<pre><code>./build-local-gpu/diffusion.gpu.32 64
+# 変更例: 128^3 格子で解く → ./build-local-gpu/diffusion.gpu.32 128 (κ 等は src/main.* の定数)</code></pre>
 </div>
 
 <p>引数 <code>64</code> は <span class="key">N (= nx × ny × nz の N、つまり 64×64×64 立方体)</span>
 を指定します (<code>./binary 64</code> で 262,144 格子点)。</p>
+
+<p><span class="key">実行時に指定できるのは N だけ</span>です。N の後ろに引数を書いても無視されます (エラーにはなりません)。
+拡散係数などその他の条件は、各 variant の <code>src/main.*</code> に定数として書かれています。</p>
+
+<table>
+<thead><tr><th>項目</th><th>指定方法</th><th>値</th><th>変えると何が変わるか</th></tr></thead>
+<tbody>
+<tr><td><strong>N</strong> (1 辺の格子点数)</td><td>引数</td><td>必須</td><td><strong>問題サイズ</strong>。格子点数 = N<sup>3</sup>。性能比較で振るのはこれ</td></tr>
+<tr><td>計算領域</td><td><code>lx, ly, lz</code></td><td>1.0 (単位立方体)</td><td>格子幅 dx = lx/N が変わる</td></tr>
+<tr><td>拡散係数 κ</td><td><code>kappa</code></td><td>0.1</td><td><strong>ステップ数・計算量は変わらない</strong>。到達時刻が変わる</td></tr>
+<tr><td>時間刻み dt</td><td><code>dt</code> の式</td><td>0.1 · dx<sup>2</sup> / κ</td><td>係数 0.1 を 1/6 より大きくすると<strong>発散</strong>する</td></tr>
+<tr><td>ステップ数</td><td><code>nt</code> の式</td><td>512·256·256 / N<sup>2</sup></td><td>測定時間が変わる</td></tr>
+</tbody>
+</table>
+
+<p>dt が κ に反比例して決まるため、ステンシルの係数 κ·dt/dx<sup>2</sup> は κ によらず 0.1 になります。
+κ を変えてもステップ数・計算量・性能は変わらず、到達時刻 (<code>last_sim_time</code>) が 1/κ に比例して変わります
+(浮動小数の丸めの違いで <code>error</code> 列は変わります)。安定性を左右するのは dt の係数 0.1 の方で、
+N=64 の実測では 0.16 までは計算でき、0.17 で <code>nan</code> になりました。</p>
+
+<p>ステップ数が N<sup>2</sup> に反比例するので、総計算量は N に比例します。N=32 / 64 / 128 で
+ステップ数は 32,768 / 8,192 / 2,048、到達時刻は 32.0 / 2.0 / 0.125 です。
+到達時刻が N で大きく違うため、<code>error</code> 列は N をまたいで比べられません。</p>
 
 <p>標準出力例 (CSV、10 カラム):</p>
 <div class="code-block">
@@ -567,6 +591,8 @@ export OMP_PLACES=threads
 
 
 # === 実行 (N = nx*ny*nz の N; 64 → 64x64x64 立方体) ===
+#   引数は N だけ (2 番目以降は無視)。拡散係数 κ=0.1 などは src/main.* の定数。
+#   変更例: 128^3 格子で解く → ./build-miyabi-uni/diffusion.uni.32 128
 N=64
 ./build-miyabi-uni/diffusion.uni.32 $N</code></pre>
 </div>
@@ -733,6 +759,8 @@ export OMP_PLACES=threads
 
 
 # === 実行 (N = nx*ny*nz の N; 64 → 64x64x64 立方体) ===
+#   引数は N だけ (2 番目以降は無視)。拡散係数 κ=0.1 などは src/main.* の定数。
+#   変更例: 128^3 格子で解く → ./build-miyabi-gpu/diffusion.gpu.32 128
 N=64
 ./build-miyabi-gpu/diffusion.gpu.32 $N</code></pre>
 </div>

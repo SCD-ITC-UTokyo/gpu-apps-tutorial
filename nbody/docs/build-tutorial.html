@@ -350,12 +350,35 @@ cmake --build build-local-gpu</code></pre>
 <h4>実行 (BENCHMARK_MODE のオプション)</h4>
 <div class="code-block">
   <div class="code-header"><span class="code-label">bash</span><button class="copy-btn">コピー</button></div>
-<pre><code>./build-local-gpu/nbody.gpu.32.32 --num_min=1024 --num_max=65536 --num_bin=7</code></pre>
+<pre><code>./build-local-gpu/nbody.gpu.32.32 --num_min=1024 --num_max=65536 --num_bin=7
+# 変更例: 粒子数 4096〜65536 を 5 点で測る → ./build-local-gpu/nbody.gpu.32.32 --num_min=4096 --num_max=65536 --num_bin=5</code></pre>
 </div>
 
 <p>nbody は位置引数を取りません。<code>BENCHMARK_MODE</code> では粒子数を
 <code>--num_min</code> 〜 <code>--num_max</code> の間で <code>--num_bin</code> 点だけ対数刻みに振って測定します
 (引数なしなら既定 <code>num_min=1024, num_max=4194304, num_bin=13, elapse_min=1.0</code>)。</p>
+
+<p>fem・diffusion と違って<span class="key">名前付きのオプション</span>で、<code>--key=value</code> と
+<code>--key value</code> のどちらでも指定でき、順番は自由です。一覧は <code>--help</code> で表示されます。</p>
+
+<table>
+<thead><tr><th>オプション</th><th>意味</th><th>既定値</th><th>変えると何が変わるか</th></tr></thead>
+<tbody>
+<tr><td><code>--num_min</code></td><td>測定する粒子数の下限</td><td>1024</td><td rowspan="3"><strong>問題サイズ</strong>。性能比較で振るのはこの 3 つ</td></tr>
+<tr><td><code>--num_max</code></td><td>測定する粒子数の上限</td><td>4194304</td></tr>
+<tr><td><code>--num_bin</code></td><td>下限〜上限を対数刻みで何点測るか</td><td>13</td></tr>
+<tr><td><code>--elapse_min</code></td><td>1 測定あたりの最小経過時間 (秒)</td><td>1.0</td><td>繰り返し回数が変わる。性能は変わらない</td></tr>
+<tr><td><code>--softening</code></td><td>軟化長 (Plummer softening)</td><td>0.015625</td><td rowspan="4">物理条件のみ。<strong>性能は変わらない</strong></td></tr>
+<tr><td><code>--mass</code></td><td>系の全質量</td><td>1.0</td></tr>
+<tr><td><code>--radius</code></td><td>初期球の半径</td><td>1.0</td></tr>
+<tr><td><code>--virial</code></td><td>初期条件の virial 比</td><td>0.2</td></tr>
+<tr><td><code>--file</code></td><td>出力ファイル名 (<code>log/&lt;file&gt;_run.csv</code>)</td><td>collapse</td><td>出力先だけ</td></tr>
+</tbody>
+</table>
+
+<p>直接法は粒子数 N に対して N<sup>2</sup> 回の相互作用を計算するので、計算量は粒子数だけで決まります。
+粒子数 8,192 で <code>--softening</code> / <code>--virial</code> / <code>--mass</code> / <code>--radius</code> を
+変えた実測でも、性能は 8.9〜9.0e+10 Flop/s で変わりませんでした (C++/openmp-cpu、FP32)。</p>
 
 <p>測定結果は標準出力ではなく <code>log/&lt;--file の値&gt;_run.csv</code> (既定 <code>log/collapse_run.csv</code>) に追記されます
 (9 カラム CSV、1 行目が列名):</p>
@@ -553,6 +576,7 @@ export OMP_PLACES=threads
 #   elapse_min=1.0 [s]) が使われる。変更する場合は下のコメントを参照:
 #     --num_min N --num_max N --num_bin N --elapse_min SEC --file NAME
 #   使用可能なオプション一覧は --help で表示される。
+#   変更例: 粒子数 4096〜65536 を 5 点で測る → ./build-miyabi-uni/nbody.uni.32.32 --num_min=4096 --num_max=65536 --num_bin=5
 ./build-miyabi-uni/nbody.uni.32.32</code></pre>
 </div>
 
@@ -720,6 +744,7 @@ export OMP_PLACES=threads
 #   elapse_min=1.0 [s]) が使われる。変更する場合は下のコメントを参照:
 #     --num_min N --num_max N --num_bin N --elapse_min SEC --file NAME
 #   使用可能なオプション一覧は --help で表示される。
+#   変更例: 粒子数 4096〜65536 を 5 点で測る → ./build-miyabi-gpu/nbody.gpu.32.32 --num_min=4096 --num_max=65536 --num_bin=5
 ./build-miyabi-gpu/nbody.gpu.32.32</code></pre>
 </div>
 
